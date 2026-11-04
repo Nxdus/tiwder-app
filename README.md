@@ -1,5 +1,16 @@
 # tiwder-app
 
+## Backend (NestJS)
+
+```sh
+cd apps/backend
+bun install
+bun run start:dev
+```
+
+The backend runs at `http://localhost:3001`. Set `PORT` to override the port.
+Run `bun run build`, `bun run test`, and `bun run test:e2e` from `apps/backend`.
+
 ## Local PostgreSQL
 
 Start the database:
