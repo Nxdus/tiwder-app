@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,7 +8,12 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { Student } from "../time-slot/students";
 
-export default function StudentCard({ student, selectable = false }: { student: Student; selectable?: boolean }) {
+export default function StudentCard({ student, selectable = false, status, photoDetails }: {
+  student: Student;
+  selectable?: boolean;
+  status?: ReactNode;
+  photoDetails?: ReactNode;
+}) {
   return (
     <Card
       className={cn(
@@ -42,6 +48,11 @@ export default function StudentCard({ student, selectable = false }: { student: 
             />
           </div>
         )}
+        {photoDetails && (
+          <div className="absolute inset-x-2 bottom-3 flex items-center justify-center gap-1.5">
+            {photoDetails}
+          </div>
+        )}
         {selectable && (
           <Badge
             aria-hidden="true"
@@ -53,9 +64,12 @@ export default function StudentCard({ student, selectable = false }: { student: 
       </div>
       <CardContent className="flex flex-col gap-4 p-5">
         <div className="flex flex-col items-start gap-3">
-          <div className="flex w-full flex-wrap items-center justify-between gap-2 text-xl leading-6">
-            <h2 className="font-semibold">{student.name}</h2>
-            <Badge variant="secondary">{student.grade}</Badge>
+          <div className="flex w-full items-start justify-between gap-2">
+            <div className={cn("flex min-w-0 flex-wrap items-center gap-2 text-xl leading-6", !status && "w-full justify-between")}>
+              <h2 className="font-semibold">{student.name}</h2>
+              <Badge variant="secondary">{student.grade}</Badge>
+            </div>
+            {status}
           </div>
           <a
             href={`tel:${student.phone.replaceAll("-", "")}`}
