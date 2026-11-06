@@ -8,6 +8,9 @@ import {
   CircleAlert,
   Clock,
   Gauge,
+  ListFilter,
+  Mail,
+  Phone,
   BadgeDollarSign,
   GraduationCap,
   Heart,
@@ -17,7 +20,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 type Tutor = {
@@ -32,10 +35,10 @@ type Tutor = {
 };
 
 const tutors: Tutor[] = [
-  { name: "Mali S.", age: 23, school: "Computer Science, KMUTT", rate: 250, experience: "2 years", about: "สอนพื้นฐาน Programming และอธิบายแบบเป็นขั้นตอน เหมาะกับคนที่อยากเริ่มจากศูนย์", subjects: [{ category: "Computer Science", name: "Python Programming", level: "Advanced" }, { category: "Mathematics", name: "Calculus", level: "Intermediate" }], colors: "from-violet-500 via-fuchsia-400 to-amber-300" },
-  { name: "Narin P.", age: 25, school: "Engineering, Chulalongkorn", rate: 300, experience: "3 years", about: "ติวคณิตศาสตร์และฟิสิกส์ด้วยโจทย์จริง พร้อมสรุปสูตรที่จำเป็นก่อนสอบ", subjects: [{ category: "Mathematics", name: "Linear Algebra", level: "Advanced" }, { category: "Mathematics", name: "Calculus", level: "Advanced" }, { category: "Physics", name: "Mechanics", level: "Intermediate" }], colors: "from-sky-500 via-cyan-400 to-emerald-300" },
-  { name: "Pim K.", age: 22, school: "Arts, Thammasat University", rate: 220, experience: "2 years", about: "ช่วยให้พูดและเขียนภาษาอังกฤษมั่นใจขึ้น ปรับบทเรียนตามเป้าหมายของผู้เรียน", subjects: [{ category: "Languages", name: "English Conversation", level: "Intermediate" }, { category: "Languages", name: "Academic Writing", level: "Advanced" }], colors: "from-rose-400 via-orange-300 to-yellow-200" },
-  { name: "Tee W.", age: 24, school: "ICT, Mahidol University", rate: 280, experience: "4 years", about: "สอนเขียนเว็บและเตรียม Portfolio โดยเน้นทำโปรเจกต์จริงไปพร้อมกัน", subjects: [{ category: "Computer Science", name: "Web Development", level: "Advanced" }, { category: "Computer Science", name: "Python Programming", level: "Intermediate" }], colors: "from-indigo-500 via-blue-400 to-teal-300" },
+  { name: "Mali Srisuk", age: 23, school: "Computer Science, KMUTT", rate: 250, experience: "2 years", about: "สอนพื้นฐาน Programming และอธิบายแบบเป็นขั้นตอน เหมาะกับคนที่อยากเริ่มจากศูนย์", subjects: [{ category: "Computer Science", name: "Python Programming", level: "Advanced" }, { category: "Mathematics", name: "Calculus", level: "Intermediate" }], colors: "from-violet-500 via-fuchsia-400 to-amber-300" },
+  { name: "Narin Phanich", age: 25, school: "Engineering, Chulalongkorn", rate: 300, experience: "3 years", about: "ติวคณิตศาสตร์และฟิสิกส์ด้วยโจทย์จริง พร้อมสรุปสูตรที่จำเป็นก่อนสอบ", subjects: [{ category: "Mathematics", name: "Linear Algebra", level: "Advanced" }, { category: "Mathematics", name: "Calculus", level: "Advanced" }, { category: "Physics", name: "Mechanics", level: "Intermediate" }], colors: "from-sky-500 via-cyan-400 to-emerald-300" },
+  { name: "Pim Kittisak", age: 22, school: "Arts, Thammasat University", rate: 220, experience: "2 years", about: "ช่วยให้พูดและเขียนภาษาอังกฤษมั่นใจขึ้น ปรับบทเรียนตามเป้าหมายของผู้เรียน", subjects: [{ category: "Languages", name: "English Conversation", level: "Intermediate" }, { category: "Languages", name: "Academic Writing", level: "Advanced" }], colors: "from-rose-400 via-orange-300 to-yellow-200" },
+  { name: "Tee Wongsa", age: 24, school: "ICT, Mahidol University", rate: 280, experience: "4 years", about: "สอนเขียนเว็บและเตรียม Portfolio โดยเน้นทำโปรเจกต์จริงไปพร้อมกัน", subjects: [{ category: "Computer Science", name: "Web Development", level: "Advanced" }, { category: "Computer Science", name: "Python Programming", level: "Intermediate" }], colors: "from-indigo-500 via-blue-400 to-teal-300" },
 ];
 
 const choices = tutors
@@ -49,6 +52,7 @@ export default function Home() {
   const [matched, setMatched] = useState<{ tutor: Tutor; subjects: string[] }[]>([]);
   const [confirmation, setConfirmation] = useState<"accept" | "reject" | null>(null);
   const [selectedSearch, setSelectedSearch] = useState<Tutor["subjects"][number] | null>(null);
+  const [activeSearch, setActiveSearch] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [openedTutor, setOpenedTutor] = useState<Tutor | null>(null);
   const [pendingTutor, setPendingTutor] = useState<Tutor | null>(null);
@@ -61,6 +65,9 @@ export default function Home() {
   const [isDragging, setIsDragging] = useState(false);
   const [isResettingCard, setIsResettingCard] = useState(false);
   const [cardVersion, setCardVersion] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+  const [photoSelection, setPhotoSelection] = useState({ tutor: "", index: 0 });
   const startX = useRef<number | null>(null);
   const dragXRef = useRef(0);
   const matchingTutors = useMemo(() => {
@@ -69,7 +76,54 @@ export default function Home() {
   }, [filter, query]);
   const deck = matchingTutors.length ? matchingTutors : tutors;
   const tutor = openedTutor ?? deck[currentIndex % deck.length];
+  const photoIndex = photoSelection.tutor === tutor.name ? photoSelection.index : 0;
+  function changePhoto(direction: number) {
+    setPhotoSelection({ tutor: tutor.name, index: (photoIndex + direction + 3) % 3 });
+  }
+  useEffect(() => {
+    function closeSearch(event: PointerEvent) {
+      if (event.target instanceof Node && !searchRef.current?.contains(event.target)) setSearchOpen(false);
+    }
+    document.addEventListener("pointerdown", closeSearch);
+    return () => document.removeEventListener("pointerdown", closeSearch);
+  }, []);
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+  const categorySuggestions = Array.from(new Set(choices.map((subject) => subject.category)))
+    .filter((category) => query.trim() && category.toLowerCase().includes(query.trim().toLowerCase()));
   const suggestions = choices.filter((subject) => [subject.name, subject.category].some((value) => value.toLowerCase().includes(query.toLowerCase()))).slice(0, 6);
+  const searchOptions = categorySuggestions.length
+    ? categorySuggestions.map((category) => ({ key: `category:${category}`, category }))
+    : Array.from(new Set(suggestions.map((subject) => subject.category))).flatMap((category) => [
+        { key: `category:${category}`, category },
+        ...suggestions.filter((subject) => subject.category === category).map((subject) => ({ key: `subject:${subject.name}`, category, subject })),
+      ]);
+  function searchOptionProps(key: string) {
+    return { role: "option", id: `search-option-${encodeURIComponent(key)}`, "aria-selected": activeSearch === key };
+  }
+  function handleSearchKey(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") { setSearchOpen(false); setActiveSearch(null); return; }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      setSearchOpen(true);
+      if (!searchOptions.length) return;
+      const current = searchOptions.findIndex((option) => option.key === activeSearch);
+      const next = current < 0 ? (event.key === "ArrowDown" ? 0 : searchOptions.length - 1) : (current + (event.key === "ArrowDown" ? 1 : -1) + searchOptions.length) % searchOptions.length;
+      setActiveSearch(searchOptions[next].key);
+    } else if (event.key === "Enter" && searchOpen && activeSearch) {
+      event.preventDefault();
+      const option = searchOptions.find((item) => item.key === activeSearch);
+      if (!option) return;
+      if ("subject" in option && option.subject) chooseSuggestion(option.subject);
+      else { setFilter(option.category); setQuery(option.category); setSelectedSearch(null); setSearchOpen(false); setCurrentIndex(0); }
+      setActiveSearch(null);
+    }
+  }
+  useEffect(() => {
+    if (searchOpen && activeSearch) document.getElementById(`search-option-${encodeURIComponent(activeSearch)}`)?.scrollIntoView({ block: "nearest" });
+  }, [searchOpen, activeSearch]);
+
   const groupedSubjects = tutor.subjects.reduce<Record<string, Tutor["subjects"]>>((groups, subject) => {
     (groups[subject.category] ??= []).push(subject);
     return groups;
@@ -89,6 +143,7 @@ export default function Home() {
         const random = Math.floor(Math.random() * (deck.length - 1));
         return random >= current ? random + 1 : random;
       });
+      setPhotoSelection({ tutor: "", index: 0 });
       setCardVersion((version) => version + 1);
       dragXRef.current = 0;
       setDragX(0);
@@ -96,13 +151,17 @@ export default function Home() {
     }, 240);
   }
 
-  function finishDrag() {
+  function finishDrag(event: React.PointerEvent<HTMLDivElement>) {
     if (startX.current === null) return;
     const distance = dragXRef.current;
     startX.current = null;
     setIsDragging(false);
     if (Math.abs(distance) >= 90) advance(distance < 0 ? "left" : "right");
     else {
+      if (event.type === "pointerup" && Math.abs(distance) < 5) {
+        const bounds = event.currentTarget.getBoundingClientRect();
+        changePhoto(event.clientX < bounds.left + bounds.width / 2 ? -1 : 1);
+      }
       dragXRef.current = 0;
       setDragX(0);
     }
@@ -123,8 +182,9 @@ export default function Home() {
     if (confirmation === "accept") setMatched((items) => [...items.filter((item) => item.tutor.name !== openedTutor.name), offer]);
     setOffered((items) => items.filter((item) => item.tutor.name !== openedTutor.name));
     setConfirmation(null);
-    setOpenedTutor(null);
-    setDetails(false);
+    setOpenedTutor(confirmation === "accept" ? offer.tutor : null);
+    setDetails(confirmation === "accept");
+    setPhotoSelection({ tutor: "", index: 0 });
     setTab(confirmation === "accept" ? "Matched" : "Offered");
   }
 
@@ -134,32 +194,32 @@ export default function Home() {
         <h1 className="text-3xl font-bold tracking-tight">Tiwder</h1>
         <nav className="flex items-center gap-2" aria-label="Main navigation">
           {["Discover", "Offered", "Matched"].map((item) => (
-            <Button key={item} onClick={() => { setTab(item); setOpenedTutor(null); setDetails(false); }} variant="secondary" className={`h-[33px] px-4 text-sm text-black ${tab === item ? "bg-[#b1b1b1]" : "bg-[#d9d9d9]"}`}>{item}</Button>
+            <Button key={item} onClick={() => { setTab(item); setOpenedTutor(item === "Matched" ? matched.at(-1)?.tutor ?? null : null); setDetails(item === "Matched" && matched.length > 0); setPhotoSelection({ tutor: "", index: 0 }); }} variant="secondary" className={`h-[33px] px-4 text-sm text-black ${tab === item ? "bg-[#b1b1b1]" : "bg-[#d9d9d9]"}`}>{item}</Button>
           ))}
         </nav>
         <Button variant="secondary" size="icon" className="justify-self-end" aria-label="Profile"><UserRound /></Button>
       </header>
 
       {!openedTutor && !details && <section className="mx-auto mt-8 w-full max-w-[352px]">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-4 top-2 size-4" />
-          {selectedSearch && !searchOpen ? <button type="button" onClick={() => setSearchOpen(true)} className="flex min-h-8 w-full items-center gap-2 rounded-2xl bg-[#d9d9d9] py-2 pl-10 pr-4 text-left text-xs"><span>{selectedSearch.name}</span><span aria-hidden="true" className="size-1 shrink-0 rounded-full bg-black" /><span className="font-semibold">{selectedSearch.category}</span></button> : <input value={query} onFocus={() => setSearchOpen(true)} onKeyDown={(event) => { if (event.key === "Escape") setSearchOpen(false); }} onChange={(event) => { setQuery(event.target.value); setFilter(null); setSelectedSearch(null); setCurrentIndex(0); }} placeholder="Find something you want to study..." aria-label="Search subjects or categories" className="h-8 w-full rounded-2xl bg-[#d9d9d9] pl-10 pr-4 text-xs outline-none focus:ring-2 focus:ring-zinc-400" />}
-          {searchOpen && <div className="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-2xl bg-[#d9d9d9] p-2 shadow-lg">
-            {Array.from(new Set(suggestions.map((subject) => subject.category))).map((category) => <div key={category}><button type="button" onClick={() => { setFilter(category); setQuery(category); setSelectedSearch(null); setSearchOpen(false); }} className="w-full px-1 text-left text-xs font-bold">{category}</button>{suggestions.filter((subject) => subject.category === category).map((subject) => <button type="button" key={subject.name} onClick={() => chooseSuggestion(subject)} className={`block w-full rounded-full px-1 py-0.5 text-left text-xs hover:bg-[#b1b1b1] ${selectedSearch?.name === subject.name ? "bg-[#b1b1b1]" : ""}`}>{subject.name}</button>)}</div>)}
-            {!suggestions.length && <p className="p-2 text-xs">No matching subjects</p>}
+        <div ref={searchRef} className="relative">
+          {tab === "Discover" ? <Search className="pointer-events-none absolute left-4 top-2 size-4" /> : <ListFilter className="pointer-events-none absolute left-4 top-2 size-4" />}
+          {selectedSearch && !searchOpen ? <button type="button" onClick={() => { setQuery(selectedSearch.name); setSearchOpen(true); }} className="flex min-h-8 w-full items-center gap-2 rounded-2xl bg-[#d9d9d9] py-2 pl-10 pr-4 text-left text-xs"><span>{selectedSearch.name}</span><span aria-hidden="true" className="size-1 shrink-0 rounded-full bg-black" /><span className="font-semibold">{selectedSearch.category}</span></button> : <input ref={searchInputRef} value={query} onFocus={() => setSearchOpen(true)} role="combobox" aria-autocomplete="list" aria-expanded={searchOpen} aria-controls="search-options" aria-activedescendant={searchOpen && activeSearch ? `search-option-${encodeURIComponent(activeSearch)}` : undefined} onKeyDown={handleSearchKey} onChange={(event) => { setActiveSearch(null); setQuery(event.target.value); setFilter(null); setSelectedSearch(null); setCurrentIndex(0); }} placeholder="Find something you want to study..." aria-label="Search subjects or categories" className="h-8 w-full rounded-2xl bg-[#d9d9d9] pl-10 pr-4 text-xs outline-none focus:ring-2 focus:ring-zinc-400" />}
+          {searchOpen && <div id="search-options" role="listbox" aria-label="Subjects and categories" className="[&_[aria-selected=true]]:bg-[#b1b1b1] absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-2xl bg-[#d9d9d9] p-2 shadow-lg">
+            {categorySuggestions.length > 0 ? categorySuggestions.map((category) => <button type="button" key={category} {...searchOptionProps(`category:${category}`)} onClick={() => { setFilter(category); setQuery(category); setSelectedSearch(null); setSearchOpen(false); setCurrentIndex(0); }} className="block w-full rounded-full px-2 py-1 text-left text-xs font-semibold hover:bg-[#b1b1b1]">{category}</button>) : Array.from(new Set(suggestions.map((subject) => subject.category))).map((category) => <div key={category}><button type="button" {...searchOptionProps(`category:${category}`)} onClick={() => { setFilter(category); setQuery(category); setSelectedSearch(null); setSearchOpen(false); }} className="w-full px-1 text-left text-xs font-bold">{category}</button>{suggestions.filter((subject) => subject.category === category).map((subject) => <button type="button" key={subject.name} {...searchOptionProps(`subject:${subject.name}`)} onClick={() => chooseSuggestion(subject)} className={`block w-full rounded-full px-1 py-0.5 text-left text-xs hover:bg-[#b1b1b1] ${selectedSearch?.name === subject.name ? "bg-[#b1b1b1]" : ""}`}>{subject.name}</button>)}</div>)}
+            {!suggestions.length && !categorySuggestions.length && <p className="p-2 text-xs">No matching subjects</p>}
             <button type="button" onClick={() => { setFilter(null); setQuery(""); setSelectedSearch(null); setSearchOpen(false); }} className="mt-2 text-xs underline">Clear filter</button>
           </div>}
         </div>
       </section>}
 
       {tab !== "Discover" && !openedTutor ? <section className="mx-auto mt-8 grid max-w-[520px] grid-cols-1 gap-8 sm:grid-cols-3" aria-label="Offered tutors">
-        {(tab === "Offered" ? offered : matched).filter((offer) => !(filter ?? query) || offer.tutor.subjects.some((subject) => `${subject.name} ${subject.category}`.toLowerCase().includes((filter ?? query).toLowerCase()))).map((offer) => <button type="button" key={offer.tutor.name} onClick={() => { setOpenedTutor(offer.tutor); setDetails(true); }} className="relative aspect-[152/270] overflow-hidden rounded-2xl bg-[#d9d9d9] text-left">
+        {(tab === "Offered" ? offered : matched).filter((offer) => !(filter ?? query) || offer.tutor.subjects.some((subject) => `${subject.name} ${subject.category}`.toLowerCase().includes((filter ?? query).toLowerCase()))).map((offer) => <button type="button" key={offer.tutor.name} onClick={() => { setOpenedTutor(offer.tutor); setPhotoSelection({ tutor: "", index: 0 }); setDetails(true); }} className="relative aspect-[152/270] overflow-hidden rounded-2xl bg-[#d9d9d9] text-left">
           <TutorPhoto tutor={offer.tutor} />
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 pb-3 pt-12 text-white"><p className="text-sm font-semibold">{offer.tutor.name} <span className="ml-1 font-normal">{offer.tutor.age}</span></p><p className="mt-2 flex items-center gap-1 text-[10px]"><CalendarDays className="size-3" />Schedule not set</p><p className="mt-1 flex items-center gap-1 text-[10px]"><Clock className="size-3" />Awaiting tutor response</p></div>
         </button>)}
         {((tab === "Matched" ? matched : offered).length === 0) && <p className="col-span-full py-16 text-center text-sm text-zinc-500">{tab === "Matched" ? "No matched tutors yet." : "Your confirmed tutors will appear here."}</p>}
       </section> : <section className="mx-auto mt-8 w-full max-w-[330px]" aria-label="Discover tutors">
-        {details && <Button variant="ghost" onClick={() => { setDetails(false); setOpenedTutor(null); }} className="mb-4 h-auto justify-start gap-2 p-0 text-sm font-normal"><ArrowLeft className="size-4" />Back to {openedTutor ? tab.toLowerCase() : "discover"}</Button>}
+        {details && tab !== "Matched" && <Button variant="ghost" onClick={() => { setDetails(false); setOpenedTutor(null); }} className="mb-4 h-auto justify-start gap-2 p-0 text-sm font-normal"><ArrowLeft className="size-4" />Back to {openedTutor ? tab.toLowerCase() : "discover"}</Button>}
         <div className="[perspective:1400px]">
           <div
             className={`relative touch-pan-y select-none [transform-style:preserve-3d] ${isDragging ? "cursor-grabbing" : isResettingCard ? "cursor-grab" : details ? "cursor-default transition-transform duration-500" : "cursor-grab transition-transform duration-500"}`}
@@ -170,9 +230,9 @@ export default function Home() {
             onPointerCancel={finishDrag}
           >
             <div key={cardVersion} className="[animation:card-enter_520ms_cubic-bezier(.22,1.28,.36,1)_both]">
-            <article className={`relative h-[587px] overflow-hidden rounded-2xl bg-[#d9d9d9] transition-transform duration-700 [backface-visibility:hidden] ${details ? "[transform:rotateY(180deg)]" : ""}`}>
-              <TutorPhoto tutor={tutor} />
-              <Carousel />
+            <article tabIndex={details ? -1 : 0} aria-label="Tutor photos. Use left and right arrow keys to change photo." onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); changePhoto(event.key === "ArrowLeft" ? -1 : 1); } }} className={`relative ${tab === "Matched" ? "h-[645px]" : "h-[587px]"} overflow-hidden rounded-2xl bg-[#d9d9d9] transition-transform duration-700 [backface-visibility:hidden] ${details ? "[transform:rotateY(180deg)]" : ""}`}>
+              <TutorPhoto tutor={tutor} photoIndex={photoIndex} />
+              <Carousel activeIndex={photoIndex} />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-5 pt-20 text-white">
                 <h2 className="text-2xl font-semibold">{tutor.name} <span className="ml-3 font-normal">{tutor.age}</span></h2>
                 <p className="mt-2 flex items-center gap-2 text-sm"><GraduationCap className="size-5" />{tutor.school}</p>
@@ -182,9 +242,9 @@ export default function Home() {
             </article>
 
             <article inert={!details} style={{ transform: details ? "rotateY(0deg)" : "rotateY(180deg)" }} className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl bg-[#f3f3f3] transition-transform duration-700 [backface-visibility:hidden]">
-              <div className="relative h-[230px] shrink-0 overflow-hidden"><TutorPhoto tutor={tutor} /><Carousel />{openedTutor && <div className="absolute inset-x-2 bottom-2 flex justify-between gap-2 text-[10px]"><span className="flex items-center gap-1 rounded-full bg-[#aeaeb2] px-2 py-1"><Clock className="size-4" />Schedule not set</span><span className="rounded-full bg-[#aeaeb2] px-2 py-1">฿ {tutor.rate}</span></div>}</div>
+              <div role="group" aria-label="Tutor photos" className="relative h-[230px] shrink-0 overflow-hidden"><button type="button" aria-label="Previous tutor photo" onClick={() => changePhoto(-1)} className="absolute inset-y-0 left-0 z-10 w-1/2 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white" /><button type="button" aria-label="Next tutor photo" onClick={() => changePhoto(1)} className="absolute inset-y-0 right-0 z-10 w-1/2 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white" /><TutorPhoto tutor={tutor} photoIndex={photoIndex} /><Carousel activeIndex={photoIndex} />{openedTutor && <div className="absolute inset-x-2 bottom-2 flex justify-between gap-2 text-[10px]"><span className="flex items-center gap-1 rounded-full bg-[#aeaeb2] px-2 py-1"><Clock className="size-4" />Schedule not set</span><span className="rounded-full bg-[#aeaeb2] px-2 py-1">฿ {tutor.rate}</span></div>}</div>
               <div className="min-h-0 flex-1 overflow-y-auto p-4 text-[10px]">
-                <div className="flex items-center justify-between"><h2 className="text-xl font-semibold">{tutor.name} <span className="ml-2 font-normal">{tutor.age}</span></h2>{openedTutor && <span className="flex items-center gap-1 rounded-full bg-[#aeaeb2] px-1.5 text-[10px] font-semibold"><CircleAlert className="size-3" />{tab === "Matched" ? "Confirmed" : "Pending"}</span>}</div>
+                <div className="flex items-center justify-between"><h2 className="text-xl font-semibold">{tutor.name} <span className="ml-2 font-normal">{tutor.age}</span></h2>{openedTutor && <span className="flex items-center gap-1 rounded-full bg-[#aeaeb2] px-1.5 text-[10px] font-semibold"><CircleAlert className="size-3" />{tab === "Matched" ? "In Program" : "Pending"}</span>}</div>
                 <div className="mt-3 space-y-3">
                   <p className="flex items-center gap-2"><GraduationCap className="size-4" />{tutor.school}</p>
                   <p className="flex items-center gap-2"><BadgeDollarSign className="size-4" />฿ {tutor.rate} / hour</p>
@@ -196,6 +256,7 @@ export default function Home() {
                 <div className="my-4 border-t border-black" />
                 <h3 className="text-base font-semibold">Subject</h3>
                 {tutor.subjects.filter((subject) => !openedTutor || (tab === "Matched" ? matched : offered).find((item) => item.tutor.name === tutor.name)?.subjects.includes(subject.name)).map((subject) => <div key={subject.name} className="mt-3"><p className="text-xs font-medium">{subject.name}</p><p className="mt-1 flex items-center gap-1"><Gauge className="size-4" />{subject.level}</p></div>)}
+                {tab === "Matched" && <><div className="my-4 border-t border-black" /><h3 className="text-base font-semibold">Contact</h3><p className="mt-3 flex items-center gap-2"><Phone className="size-4" />Not provided</p><p className="mt-3 flex items-center gap-2"><Mail className="size-4" />Not provided</p></>}
               </div>
             </article>
             </div>
@@ -220,14 +281,19 @@ export default function Home() {
   );
 }
 
-function Carousel() {
-  return <div className="absolute left-1/2 top-5 z-10 flex -translate-x-1/2 gap-2" aria-hidden="true"><span className="h-1 w-8 rounded-full bg-[#b0b0b0]" /><span className="h-1 w-8 rounded-full bg-white" /><span className="h-1 w-8 rounded-full bg-white" /></div>;
+function Carousel({ activeIndex }: { activeIndex: number }) {
+  return <div className="pointer-events-none absolute left-1/2 top-5 z-20 flex -translate-x-1/2 gap-2" role="status" aria-label={`Photo ${activeIndex + 1} of 3`}>{[0, 1, 2].map((index) => <span key={index} className={`h-1 w-8 rounded-full ${index === activeIndex ? "bg-white" : "bg-white/40"}`} />)}</div>;
 }
 
-function TutorPhoto({ tutor }: { tutor: Tutor }) {
-  const photos = ["photo-1534528741775-53994a69daeb", "photo-1506794778202-cad84cf45f1d", "photo-1524504388940-b1c1722653e1", "photo-1500648767791-00dcc994a43e"];
-  const photo = photos[Math.max(0, tutors.indexOf(tutor))];
+function TutorPhoto({ tutor, photoIndex = 0 }: { tutor: Tutor; photoIndex?: number }) {
+  const photos = [
+    ["photo-1534528741775-53994a69daeb", "photo-1524504388940-b1c1722653e1", "photo-1531123897727-8f129e1688ce"],
+    ["photo-1506794778202-cad84cf45f1d", "photo-1500648767791-00dcc994a43e", "photo-1517841905240-472988babdf9"],
+    ["photo-1524504388940-b1c1722653e1", "photo-1534528741775-53994a69daeb", "photo-1531123897727-8f129e1688ce"],
+    ["photo-1500648767791-00dcc994a43e", "photo-1506794778202-cad84cf45f1d", "photo-1517841905240-472988babdf9"],
+  ];
+  const photo = photos[Math.max(0, tutors.indexOf(tutor))][photoIndex];
   // shortcut: sample portraits until the tutor API supplies profile photos.
-  return <div role="img" aria-label={`Portrait of ${tutor.name}`} className="absolute inset-0 bg-[#d9d9d9] bg-cover bg-center" style={{ backgroundImage: `url(https://images.unsplash.com/${photo}?auto=format&fit=crop&w=900&q=85)` }} />;
+  return <div role="img" aria-label={`Portrait of ${tutor.name}, photo ${photoIndex + 1} of 3`} className="pointer-events-none absolute inset-0 bg-[#d9d9d9] bg-cover bg-center" style={{ backgroundImage: `url(https://images.unsplash.com/${photo}?auto=format&fit=crop&w=900&q=85)` }} />;
 }
 
