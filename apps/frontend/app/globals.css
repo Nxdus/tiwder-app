@@ -4,6 +4,13 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@keyframes card-enter {
+  0% { opacity: 0; transform: translateY(36px) scale(0.9); }
+  65% { opacity: 1; transform: translateY(-10px) scale(1.035); }
+  82% { transform: translateY(4px) scale(0.99); }
+  100% { transform: translateY(0) scale(1); }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
