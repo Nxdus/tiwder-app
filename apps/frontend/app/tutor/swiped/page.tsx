@@ -1,12 +1,10 @@
-import type { Metadata } from "next";
-
-import TutorSwiped from "./tutor-swiped";
-
-export const metadata: Metadata = {
-  title: "Swiped | Tiwder",
-  description: "View students who have swiped on your tutor profile.",
-};
-
+import TutorHeader from "@/components/navigation/tutor-header";
+import BookingList from "@/components/bookings/booking-list";
 export default function TutorSwipedPage() {
-  return <TutorSwiped />;
+  return (
+    <main className="flex min-h-screen flex-col items-center gap-8 bg-white px-5 py-8 text-foreground sm:px-8">
+      <TutorHeader />
+      <BookingList kind="interests" />
+    </main>
+  );
 }
