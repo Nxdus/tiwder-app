@@ -41,6 +41,7 @@ export const users = pgTable('users', {
   email: text().notNull(),
   name: text().notNull(),
   avatarUrl: text('avatar_url'),
+  photos: text('photos').array().notNull().default(sql`'{}'::text[]`),
   role: role(),
   onboarded: boolean().notNull().default(false),
 });

@@ -61,21 +61,19 @@ export default function TutorTimeSlot({
       : !ready
         ? "Please select a date and time."
         : null);
-  async function confirmTime() {
-    if (!date || start === null || end === null || !validRange) return;
+  async function submitRequest(action: "proposal" | "reject") {
+    if (saving) return;
+    let body: string | undefined;
+    if (action === "proposal") {
+      if (!date || start === null || end === null || !validRange) return;
+      body = JSON.stringify({ date: format(date, "yyyy-MM-dd"), start, end });
+    }
     setSaving(true);
     setError("");
     try {
       await api(
-        `/interests/${interest.id}/proposal`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            date: format(date, "yyyy-MM-dd"),
-            start,
-            end,
-          }),
-        },
+        `/interests/${interest.id}/${action}`,
+        { method: "POST", body },
         session.csrfToken,
       );
       router.push("/tutor/swiped");
@@ -83,14 +81,16 @@ export default function TutorTimeSlot({
       setError(
         cause instanceof Error
           ? cause.message
-          : "Unable to send time proposal.",
+          : action === "reject"
+            ? "Unable to decline request."
+            : "Unable to send time proposal.",
       );
     } finally {
       setSaving(false);
     }
   }
   return (
-    <div className="flex min-h-screen flex-col items-center gap-8 bg-primary/5 px-5 py-8 text-foreground sm:px-8">
+    <div className="flex min-h-screen flex-col items-center gap-8 bg-white px-5 py-8 text-foreground sm:px-8">
       <TutorHeader />
       <main
         aria-label="Schedule teaching time"
@@ -186,6 +186,14 @@ export default function TutorTimeSlot({
                   {feedback}
                 </p>
               )}
+              <Button
+                variant="destructive"
+                className="self-end"
+                disabled={saving}
+                onClick={() => void submitRequest("reject")}
+              >
+                Decline
+              </Button>
             </section>
           </div>
         </div>
@@ -216,14 +224,10 @@ export default function TutorTimeSlot({
               size="lg"
               className="rounded-lg"
               disabled={saving}
-              onClick={() => void confirmTime()}
+              onClick={() => void submitRequest("proposal")}
             >
               {saving ? "Sending…" : "Confirm Time"}
             </Button>
-            <p className="w-full text-center text-xs text-muted-foreground">
-              The student must accept this time before the lesson is confirmed.
-              All times are Bangkok.
-            </p>
           </div>
         )}
       </main>

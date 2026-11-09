@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import type { Tutor } from "@/lib/discover/tutors";
 import { formatMinutes, type Proposal } from "@/lib/api";
 import TutorPhoto from "./tutor-photo";
+import PhotoIndicators from "./photo-indicators";
 
 export default function TutorSwipeCard({
   tutor,
@@ -77,12 +78,13 @@ export default function TutorSwipeCard({
   );
   const passProgress = Math.min(Math.max(-dragX / 90, 0), 1) * 100;
   const matchProgress = Math.min(Math.max(dragX / 90, 0), 1) * 100;
+  const photoCount = tutor.photos?.length || 1;
   const photoIndex =
-    photoSelection.tutor === tutor.name ? photoSelection.index : 0;
+    photoSelection.tutor === tutor.id ? photoSelection.index % photoCount : 0;
   function changePhoto(direction: number) {
     setPhotoSelection({
-      tutor: tutor.name,
-      index: (photoIndex + direction + 3) % 3,
+      tutor: tutor.id,
+      index: (photoIndex + direction + photoCount) % photoCount,
     });
   }
   function advance(direction: "left" | "right") {
@@ -166,7 +168,7 @@ export default function TutorSwipeCard({
           <div
             id="tutor-card"
             key={cardVersion}
-            className="grid drop-shadow-[0_8px_16px_rgb(0_0_0/0.14)] [animation:card-enter_520ms_cubic-bezier(.22,1.28,.36,1)_both]"
+            className="relative grid drop-shadow-[0_8px_16px_rgb(0_0_0/0.14)] [animation:card-enter_520ms_cubic-bezier(.22,1.28,.36,1)_both]"
           >
             <article
               tabIndex={details ? -1 : 0}
@@ -180,7 +182,7 @@ export default function TutorSwipeCard({
               className={`relative [grid-area:1/1] ${tab === "Matched" ? "min-h-[645px]" : "min-h-[587px]"} overflow-hidden rounded-2xl bg-secondary transition-transform duration-700 [backface-visibility:hidden] ${details ? "[transform:rotateY(180deg)]" : ""}`}
             >
               <TutorPhoto tutor={tutor} photoIndex={photoIndex} />
-              <Carousel activeIndex={photoIndex} />
+              <PhotoIndicators activeIndex={photoIndex} count={photoCount} />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-5 pt-20 text-white">
                 <h2 className="text-xl font-semibold">
                   {tutor.name}{" "}
@@ -193,11 +195,17 @@ export default function TutorSwipeCard({
                 <p className="mt-2 flex items-center gap-2 text-sm">
                   <BadgeDollarSign className="size-5" />฿ {tutor.rate} / hr
                 </p>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div
+                  className="mt-2 flex touch-pan-x gap-2 overflow-x-auto"
+                  tabIndex={0}
+                  aria-label="Subjects"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
                   {tutor.subjects.map((subject) => (
                     <span
                       key={subject.name}
-                      className="rounded-full border border-primary/20 bg-[color-mix(in_srgb,var(--primary)_20%,var(--background))] px-2 py-1 text-xs text-primary-foreground"
+                      className="shrink-0 whitespace-nowrap rounded-full border border-primary/20 bg-[color-mix(in_srgb,var(--primary)_20%,var(--background))] px-2 py-1 text-xs text-primary-foreground"
                     >
                       {subject.name}
                     </span>
@@ -213,7 +221,7 @@ export default function TutorSwipeCard({
               style={{
                 transform: details ? "rotateY(0deg)" : "rotateY(180deg)",
               }}
-              className="relative [grid-area:1/1] flex flex-col overflow-hidden rounded-2xl bg-card text-card-foreground transition-transform duration-700 [backface-visibility:hidden]"
+              className={`${details ? "relative" : "absolute inset-0"} [grid-area:1/1] flex flex-col overflow-hidden rounded-2xl bg-card text-card-foreground transition-transform duration-700 [backface-visibility:hidden]`}
             >
               <div
                 role="group"
@@ -233,7 +241,7 @@ export default function TutorSwipeCard({
                   className="absolute inset-y-0 right-0 z-10 w-1/2 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white"
                 />
                 <TutorPhoto tutor={tutor} photoIndex={photoIndex} />
-                <Carousel activeIndex={photoIndex} />
+                <PhotoIndicators activeIndex={photoIndex} count={photoCount} />
                 {openedTutor && (
                   <div className="absolute inset-x-2 bottom-2 flex justify-between gap-2 text-xs">
                     <span className="flex items-center gap-1 rounded-full bg-secondary text-secondary-foreground px-2 py-1">
@@ -391,22 +399,5 @@ export default function TutorSwipeCard({
         </div>
       )}
     </section>
-  );
-}
-
-function Carousel({ activeIndex }: { activeIndex: number }) {
-  return (
-    <div
-      className="pointer-events-none absolute left-1/2 top-5 z-20 flex -translate-x-1/2 gap-2"
-      role="status"
-      aria-label={`Photo ${activeIndex + 1} of 3`}
-    >
-      {[0, 1, 2].map((index) => (
-        <span
-          key={index}
-          className={`h-1 w-8 rounded-full ${index === activeIndex ? "bg-white" : "bg-white/40"}`}
-        />
-      ))}
-    </div>
   );
 }

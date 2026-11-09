@@ -11,6 +11,8 @@ import { useRouter } from "next/navigation";
 import { api, type Role, type Session } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { LoadingRegion } from "@/components/loading/skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const AuthContext = createContext<{
   session: Session;
@@ -72,10 +74,12 @@ export function AuthGate({
   children,
   role,
   onboarding = false,
+  fallback,
 }: {
   children: React.ReactNode;
   role?: Role;
   onboarding?: boolean;
+  fallback?: React.ReactNode;
 }) {
   const { session, loading, error, refresh } = useAuth();
   const router = useRouter();
@@ -108,9 +112,9 @@ export function AuthGate({
     (role && user.role !== role)
   )
     return (
-      <p role="status" className="p-8 text-center">
-        Loading account…
-      </p>
+      fallback ?? <LoadingRegion label="Loading account…" className="mx-auto w-full max-w-md p-8">
+        <div className="flex flex-col gap-4"><Skeleton className="h-8 w-1/2" /><Skeleton className="h-64 w-full" /></div>
+      </LoadingRegion>
     );
   return children;
 }

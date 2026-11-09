@@ -3,6 +3,7 @@ export type Tutor = {
   name: string;
   age?: number;
   avatarUrl: string | null;
+  photos?: string[];
   school: string;
   rate: number;
   experience: string;

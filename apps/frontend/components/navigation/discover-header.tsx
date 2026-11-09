@@ -32,7 +32,7 @@ export default function DiscoverHeader({
   }, []);
 
   return (
-    <header className="mx-auto flex w-fit max-w-full items-center justify-center gap-8">
+    <header className="mx-auto flex w-full max-w-full items-center justify-between gap-8 sm:w-fit sm:justify-center">
       <h1 className="text-3xl font-bold tracking-tight">Tiwder</h1>
       <nav
         className="hidden items-center justify-center gap-8 sm:flex"
@@ -51,6 +51,9 @@ export default function DiscoverHeader({
         ))}
       </nav>
       <div className="col-start-2 row-start-1 flex items-center justify-self-end gap-2 sm:col-start-3">
+        <div className="hidden sm:block">
+          <AccountButton />
+        </div>
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
           <SheetTrigger
             render={
@@ -89,9 +92,9 @@ export default function DiscoverHeader({
                 </SheetClose>
               ))}
             </nav>
+            <AccountButton inSheet onSignedOut={() => setMenuOpen(false)} />
           </SheetContent>
         </Sheet>
-        <AccountButton />
       </div>
     </header>
   );
