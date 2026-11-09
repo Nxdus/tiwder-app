@@ -50,6 +50,49 @@ describe('Tiwder API', () => {
   });
   afterEach(() => vi.restoreAllMocks());
   const api = () => request(app.getHttpServer());
+  it('persists profile photos, preserves them on other edits, and supports removal', async () => {
+    const person = await account('photo-test');
+    const photo =
+      'data:image/jpeg;base64,' +
+      Buffer.from([255, 216, 255, 0, 255, 217]).toString('base64');
+    await api()
+      .post('/api/onboarding')
+      .set(person.headers)
+      .send({
+        role: 'student',
+        name: person.name,
+        phone: '0812345678',
+        bio: 'Learning together',
+        gradeLevel: 'University',
+        photos: [photo],
+      })
+      .expect(201);
+    await api()
+      .patch('/api/profile')
+      .set(person.headers)
+      .send({ bio: 'Updated introduction' })
+      .expect(200);
+    await api()
+      .get('/api/profile')
+      .set(person.headers)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.photos).toEqual([photo]);
+      });
+    await api()
+      .patch('/api/profile')
+      .set(person.headers)
+      .send({ photos: ['not an image'] })
+      .expect(400);
+    await api()
+      .patch('/api/profile')
+      .set(person.headers)
+      .send({ photos: [] })
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.photos).toEqual([]);
+      });
+  });
   async function account(name: string) {
     const token = randomUUID(),
       csrf = randomUUID(),
@@ -179,6 +222,10 @@ describe('Tiwder API', () => {
         students = [s1, s2],
         tutors = [t1, t2];
       const subjectId = (await api().get('/api/subjects')).body[0].id;
+      const photos = [0, 1].map(
+        (value) => 'data:image/jpeg;base64,' +
+          Buffer.from([255, 216, 255, value, 255, 217]).toString('base64'),
+      );
       await api().get('/api/matches').set(s1.headers).expect(403);
       for (const p of people) {
         const role = students.includes(p) ? 'student' : 'tutor';
@@ -190,6 +237,7 @@ describe('Tiwder API', () => {
             name: p.name,
             phone: '0812345678',
             bio: 'My bio',
+            photos,
             ...(role === 'student'
               ? { gradeLevel: 'Grade 8' }
               : {
@@ -236,6 +284,7 @@ describe('Tiwder API', () => {
       );
       expect(publicTutor).not.toHaveProperty('phone');
       expect(publicTutor).not.toHaveProperty('email');
+      expect(publicTutor.photos).toEqual(photos);
       const pairs = [
         [s1, t1],
         [overlap === 'student' ? s1 : s2, overlap === 'tutor' ? t1 : t2],
@@ -253,7 +302,9 @@ describe('Tiwder API', () => {
           await api().get('/api/interests').set(t.headers).expect(200)
         ).body.find((row: { id: string }) => row.id === interest);
         expect(preview.student).toMatchObject({ id: s.id, name: s.name });
+        expect(preview.student.photos).toEqual(photos);
         expect(preview.tutor).toMatchObject({ id: t.id, name: t.name });
+        expect(preview.tutor.photos).toEqual(photos);
         expect(preview.student).not.toHaveProperty('phone');
         expect(preview.student).not.toHaveProperty('email');
         expect(preview.tutor).not.toHaveProperty('phone');
@@ -288,6 +339,7 @@ describe('Tiwder API', () => {
       const own = await api().get('/api/matches').set(s.headers).expect(200);
       expect(own.body[0].contact.email).toBe(t.email);
       expect(own.body[0].student.id).toBe(s.id);
+        expect(own.body[0].student.photos).toEqual(photos);
       expect(own.body[0].tutor.id).toBe(t.id);
       expect(own.body[0].student).not.toHaveProperty('email');
       expect(own.body[0].tutor).not.toHaveProperty('phone');

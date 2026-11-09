@@ -4,6 +4,8 @@ import { BookOpen, Check, ListFilter, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { SearchOption, Tutor } from "@/lib/discover/tutors";
+import { Skeleton } from "@/components/ui/skeleton";
+import { LoadingRegion } from "@/components/loading/skeletons";
 
 export default function SubjectSearch({
   tab,
@@ -12,6 +14,7 @@ export default function SubjectSearch({
   selectedSearch,
   onChange,
   choices,
+  loading = false,
 }: {
   tab: string;
   hidden: boolean;
@@ -19,6 +22,7 @@ export default function SubjectSearch({
   selectedSearch: SearchOption[];
   onChange: (query: string, selected: SearchOption[]) => void;
   choices: Tutor["subjects"];
+  loading?: boolean;
 }) {
   const [activeSearch, setActiveSearch] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -239,6 +243,13 @@ export default function SubjectSearch({
               aria-label="Subjects and categories"
               className="max-h-[min(360px,50dvh)] overflow-y-auto p-2 [&_[aria-selected=true]]:bg-accent [&_[aria-selected=true]]:text-accent-foreground [&_[data-active=true]]:ring-2 [&_[data-active=true]]:ring-inset [&_[data-active=true]]:ring-ring"
             >
+              {loading && (
+                <LoadingRegion label="Loading subjects…" className="p-2">
+                  <div className="flex flex-col gap-3">
+                    {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-10 w-full" />)}
+                  </div>
+                </LoadingRegion>
+              )}
               {searchOptions.map((option) => (
                 <button
                   type="button"
@@ -274,7 +285,7 @@ export default function SubjectSearch({
                   </span>
                 </button>
               ))}
-              {!searchOptions.length && (
+              {!loading && !searchOptions.length && (
                 <div
                   role="status"
                   className="flex flex-col items-center gap-2 px-4 py-8 text-center"

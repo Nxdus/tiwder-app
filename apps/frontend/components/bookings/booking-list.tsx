@@ -1,17 +1,18 @@
 "use client";
 
-import Link from "next/link";
+import { format, parseISO } from "date-fns";
 import {
   CalendarDays,
   Clock,
   CircleAlert,
   BanknoteArrowUp,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import StudentCard from "@/components/tutor/student-card";
 import TutorSwipeCard from "@/components/discover/tutor-swipe-card";
 import TutorPhoto from "@/components/discover/tutor-photo";
+import { BookingListSkeleton } from "@/components/loading/skeletons";
 import OfferConfirmationDialog from "@/components/discover/offer-confirmation-dialog";
 import {
   api,
@@ -45,6 +46,17 @@ const labels: Record<string, string> = {
   closed: "Closed",
   expired: "Expired",
 };
+const statusVariants: Record<string, ComponentProps<typeof Badge>["variant"]> = {
+  pending: "warning",
+  proposed: "warning",
+  confirmed: "info",
+  completed: "success",
+  cancelled: "destructive",
+  rejected: "destructive",
+  withdrawn: "secondary",
+  closed: "secondary",
+  expired: "secondary",
+} as const;
 export const proposalOf = (item: Lesson): Proposal | null =>
   "proposal" in item ? item.proposal : item;
 export function studentOf(item: Lesson): Student {
@@ -53,6 +65,7 @@ export function studentOf(item: Lesson): Student {
     id: item.studentId,
     name: item.studentName,
     photoUrl: item.student?.avatarUrl ?? undefined,
+    photos: item.student?.photos,
     grade: item.student?.gradeLevel ?? "",
     about: item.student?.bio ?? "",
     phone: contact?.phone,
@@ -66,6 +79,7 @@ function tutorOf(item: Lesson): Tutor {
     id: item.tutorId,
     name: item.tutorName,
     avatarUrl: item.tutor?.avatarUrl ?? null,
+    photos: item.tutor?.photos,
     school: item.tutor?.education ?? "",
     rate: item.hourlyRate,
     experience: `${item.tutor?.experienceYears ?? 0} years`,
@@ -100,7 +114,7 @@ export function LessonBadges({
         </span>
       </Badge>
       <Badge
-        variant="secondary"
+        variant="success"
         className="h-auto gap-1 px-2 py-1 text-xs font-normal"
       >
         <BanknoteArrowUp />฿{" "}
@@ -111,7 +125,12 @@ export function LessonBadges({
     </>
   );
 }
-export default function BookingList({
+export default function BookingList(props: ComponentProps<typeof BookingListContent>) {
+  const { session } = useAuth();
+  return <BookingListContent key={`${props.kind}:${session.user?.id}`} {...props} />;
+}
+
+function BookingListContent({
   kind,
   onConfirmed,
   query = "",
@@ -135,9 +154,15 @@ export default function BookingList({
     null,
   );
   const role = session.user?.role;
+  const hasData = useRef(false);
   const load = useCallback(async () => {
+    if (!hasData.current) {
+      setLoading(true);
+      setError("");
+    }
     try {
       setItems(await api<Lesson[]>(`/${kind}`));
+      hasData.current = true;
       setError("");
     } catch (cause) {
       setError(
@@ -224,17 +249,15 @@ export default function BookingList({
         </Alert>
       )}
       {loading ? (
-        <p role="status" className="p-8 text-center">
-          Loading…
-        </p>
+        <BookingListSkeleton tutor={role === "tutor"} />
       ) : !visible.length ? (
         <Empty className="mx-auto max-w-md">
           <EmptyHeader>
             <EmptyTitle>
-              {kind === "matches" ? "No matches yet" : "No requests yet"}
+              {error ? "Lessons could not be loaded" : kind === "matches" ? "No matches yet" : "No requests yet"}
             </EmptyTitle>
             <EmptyDescription>
-              {role === "tutor"
+              {error ? "Please try again." : role === "tutor"
                 ? "Students will appear here after sending a request."
                 : "Find a tutor and choose a subject to get started."}
             </EmptyDescription>
@@ -257,7 +280,7 @@ export default function BookingList({
                   href={`/tutor/time-slot?request=${item.id}`}
                   status={
                     <Badge
-                      variant="secondary"
+                      variant={statusVariants[item.status] ?? "secondary"}
                       className="gap-1 text-xs"
                     >
                       <CircleAlert />
@@ -270,31 +293,7 @@ export default function BookingList({
                     ) : undefined
                   }
                   actions={
-                    item.status === "pending" ? (
-                      <>
-                        <Button
-                          nativeButton={false}
-                          size="sm"
-                          variant="outline"
-                          disabled={busy}
-                          render={
-                            <Link
-                              href={`/tutor/time-slot?request=${item.id}`}
-                            />
-                          }
-                        >
-                          Propose a time
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={busy}
-                          onClick={() => void action(item.id, "reject")}
-                        >
-                          Decline
-                        </Button>
-                      </>
-                    ) : kind === "matches" &&
+                    kind === "matches" &&
                       item.status === "confirmed" &&
                       future(item) ? (
                       <Button
@@ -377,33 +376,45 @@ export default function BookingList({
           />
         </>
       ) : (
-        <ul className="mx-auto mt-8 grid max-w-[520px] grid-cols-[repeat(auto-fit,152px)] justify-center gap-8">
+        <ul className="mx-auto mt-8 grid max-w-[520px] grid-cols-[repeat(auto-fill,152px)] justify-center gap-8">
           {visible.map((item) => {
             const p = proposalOf(item);
             return (
               <li key={item.id}>
                 <button
                   type="button"
+                  aria-label={`${item.tutorName}, ${status(item)}${p ? `, ${p.date}, ${formatMinutes(p.start)}–${formatMinutes(p.end)}` : ", Schedule not set"}`}
                   onClick={() => {
                     setSelectedId(item.id);
                     onDetailChange?.(true);
                   }}
-                  className="relative block aspect-[152/270] w-[152px] overflow-hidden rounded-2xl bg-secondary text-left"
+                  className="group relative block h-[270px] w-[152px] overflow-hidden rounded-2xl bg-secondary text-left text-foreground ring-1 ring-border transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   <TutorPhoto tutor={tutorOf(item)} />
-                  <div className="absolute inset-x-0 bottom-0 bg-background/90 px-3 py-3 text-xs text-foreground">
-                    <p className="text-sm font-semibold">{item.tutorName}</p>
-                    <p className="mt-2 flex items-center gap-1">
-                      <CalendarDays className="size-3" />
-                      {p ? p.date : "Schedule not set"}
+                  <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3 group-has-[img[data-loaded=true]]:text-white group-has-[img[data-loaded=true]]:[text-shadow:0_1px_3px_rgb(0_0_0/0.85)]">
+                    <p className="break-words text-sm font-semibold leading-5">
+                      {item.tutorName}
                     </p>
-                    <p className="mt-1 flex items-center gap-1">
-                      <Clock className="size-3" />
-                      {p
-                        ? `${formatMinutes(p.start)}–${formatMinutes(p.end)}`
-                        : "Awaiting tutor response"}
-                    </p>
-                    <p className="mt-1 text-xs">{status(item)}</p>
+                    <div className="flex flex-col gap-1 text-xs leading-4 text-foreground/80 group-has-[img[data-loaded=true]]:text-white">
+                      <p className="flex items-start gap-1.5">
+                        <CalendarDays aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
+                        <span>{p ? format(parseISO(p.date), "d MMM yyyy") : "Schedule not set"}</span>
+                      </p>
+                      {p && (
+                        <p className="flex items-start gap-1.5">
+                          <Clock aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
+                          <span className="tabular-nums">
+                            {formatMinutes(p.start)}–{formatMinutes(p.end)}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                    <Badge
+                      variant={item.status === "cancelled" || item.status === "rejected" ? "destructive" : "default"}
+                      className={`h-auto max-w-full whitespace-normal py-1 text-[11px] leading-4 [text-shadow:none] ${item.status === "completed" ? "border-emerald-200 bg-emerald-100 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" : item.status === "cancelled" || item.status === "rejected" ? "bg-destructive text-white dark:text-black" : ""}`}
+                    >
+                      {status(item)}
+                    </Badge>
                   </div>
                 </button>
               </li>

@@ -23,6 +23,7 @@ export type PublicTutor = {
   id: string;
   name: string;
   avatarUrl: string | null;
+  photos?: string[];
   bio: string;
   education: string;
   experienceYears: number;
@@ -30,6 +31,7 @@ export type PublicTutor = {
   teachings: Teaching[];
 };
 export type Profile = User & {
+  photos?: string[];
   phone?: string;
   bio?: string;
   gradeLevel?: string;
@@ -43,6 +45,7 @@ export type StudentPreview = {
   id: string;
   name: string;
   avatarUrl: string | null;
+  photos?: string[];
   gradeLevel: string;
   bio: string;
 };
@@ -50,6 +53,7 @@ export type TutorPreview = {
   id: string;
   name: string;
   avatarUrl: string | null;
+  photos?: string[];
   education: string;
   experienceYears: number;
   bio: string;

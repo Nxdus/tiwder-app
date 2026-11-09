@@ -16,6 +16,7 @@ import { z } from 'zod';
 import type { Request } from 'express';
 import { AuthService, type Identity } from './auth.js';
 import { DatabaseService } from './database/database.service.js';
+import { profilePhotosSchema } from './profile-photos.js';
 import {
   users,
   students,
@@ -108,6 +109,7 @@ export class ProfileService {
           id: users.id,
           name: users.name,
           avatarUrl: users.avatarUrl,
+          photos: users.photos,
           bio: tutors.bio,
           education: tutors.education,
           experienceYears: tutors.experienceYears,
@@ -171,6 +173,7 @@ export class ProfileService {
           experienceYears: tutor.shape.experienceYears,
           hourlyRate: tutor.shape.hourlyRate,
           teachings: tutor.shape.teachings,
+          photos: profilePhotosSchema,
         })
         .partial()
         .strict(),
@@ -203,7 +206,12 @@ export class ProfileService {
       });
       await tx
         .update(users)
-        .set({ name: data.name, role: data.role, onboarded: true })
+        .set({
+          name: data.name,
+          role: data.role,
+          onboarded: true,
+          ...(updates.photos !== undefined ? { photos: updates.photos } : {}),
+        })
         .where(eq(users.id, user.id));
       if (data.role === 'student') {
         const fields = {

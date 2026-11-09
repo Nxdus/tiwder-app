@@ -2,6 +2,7 @@ export type Student = {
   id: string;
   name: string;
   photoUrl?: string;
+  photos?: string[];
   grade: string;
   phone?: string;
   email?: string;

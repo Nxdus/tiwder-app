@@ -43,6 +43,7 @@ async function withProfiles<T extends { studentId: string; tutorId: string }>(
         id: users.id,
         name: users.name,
         avatarUrl: users.avatarUrl,
+        photos: users.photos,
         gradeLevel: students.gradeLevel,
         bio: students.bio,
       })
@@ -55,6 +56,7 @@ async function withProfiles<T extends { studentId: string; tutorId: string }>(
         name: users.name,
         avatarUrl: users.avatarUrl,
         education: tutors.education,
+        photos: users.photos,
         experienceYears: tutors.experienceYears,
         bio: tutors.bio,
       })

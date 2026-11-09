@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import DiscoverHeader from "@/components/navigation/discover-header";
 import { AuthGate, useAuth } from "@/components/auth/auth-provider";
@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import SubjectSearch from "./subject-search";
 import TutorSwipeCard from "./tutor-swipe-card";
 import ChooseSubjectDialog from "./choose-subject-dialog";
+import { BookingListSkeleton, TutorCardSkeleton } from "@/components/loading/skeletons";
 
 export default function Discover() {
   const router = useRouter();
@@ -35,7 +36,12 @@ export default function Discover() {
   const [details, setDetails] = useState(false);
   const [bookingDetail, setBookingDetail] = useState(false);
   const [pendingTutor, setPendingTutor] = useState<Tutor | null>(null);
+  const hasData = useRef(false);
   const load = useCallback(async () => {
+    if (!hasData.current) {
+      setLoading(true);
+      setError("");
+    }
     try {
       const [people, catalog] = await Promise.all([
         api<PublicTutor[]>("/tutors"),
@@ -46,6 +52,7 @@ export default function Discover() {
           id: tutor.id,
           name: tutor.name,
           avatarUrl: tutor.avatarUrl,
+          photos: tutor.photos,
           school: tutor.education,
           rate: Number(tutor.hourlyRate),
           experience: `${tutor.experienceYears} years`,
@@ -61,6 +68,7 @@ export default function Discover() {
         })),
       );
       setSubjects(catalog);
+      hasData.current = true;
       setError("");
     } catch (cause) {
       setError(
@@ -188,6 +196,7 @@ export default function Discover() {
       {tab === "Discover" ? (
         <>
           <SubjectSearch
+            loading={loading}
             choices={choices}
             tab={tab}
             hidden={details}
@@ -200,9 +209,7 @@ export default function Discover() {
             }}
           />
           {loading ? (
-            <p role="status" className="p-12 text-center">
-              Loading tutors…
-            </p>
+            <TutorCardSkeleton />
           ) : tutor ? (
             <TutorSwipeCard
               key={tutor.id}
@@ -261,9 +268,10 @@ export default function Discover() {
           )}
         </>
       ) : (
-        <AuthGate role="student">
+        <AuthGate role="student" fallback={<BookingListSkeleton />}>
           {tab !== "Matched" && !bookingDetail && (
             <SubjectSearch
+              loading={loading}
               choices={choices}
               tab={tab}
               hidden={false}

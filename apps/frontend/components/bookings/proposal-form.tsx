@@ -7,10 +7,15 @@ import { api, bangkokToday, type Interest } from "@/lib/api";
 import TutorTimeSlot from "@/components/tutor/time-slot/tutor-time-slot";
 import TutorHeader from "@/components/navigation/tutor-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ProposalSkeleton } from "@/components/loading/skeletons";
 
 export default function ProposalForm() {
   const search = useSearchParams();
   const id = search.get("request");
+  return <RequestForm key={id} id={id} />;
+}
+
+function RequestForm({ id }: { id: string | null }) {
   const [interest, setInterest] = useState<Interest | null>(null);
   const [today] = useState(bangkokToday);
   const [loading, setLoading] = useState(true);
@@ -50,15 +55,15 @@ export default function ProposalForm() {
         </Alert>
       )}
       {loading ? (
-        <p role="status">Loading request…</p>
-      ) : (
+        <ProposalSkeleton />
+      ) : !error ? (
         <>
           <p>Select a pending student request to schedule a teaching time.</p>
           <Link href="/tutor/swiped" className="underline">
             Back to swiped
           </Link>
         </>
-      )}
+      ) : null}
     </main>
   );
 }
