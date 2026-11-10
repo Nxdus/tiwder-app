@@ -1,5 +1,5 @@
-import Discover from "@/components/discover/discover";
+import { redirect } from "next/navigation";
 
 export default function Home() {
-  return <Discover />;
+  redirect("/student/discover");
 }

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Choice } from "@/components/auth/profile-form";
-import type { Tutor } from "@/lib/discover/tutors";
+import type { Tutor } from "@/lib/student/tutors";
 
 export default function ChooseSubjectDialog({
   tutor,
@@ -32,9 +32,9 @@ export default function ChooseSubjectDialog({
       }}
     >
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 bg-foreground/35 backdrop-blur-sm" />
-        <Dialog.Viewport className="fixed inset-0 flex items-center justify-center p-5">
-          <Dialog.Popup className="flex w-full max-w-lg flex-col gap-5 rounded-3xl bg-card p-7 text-card-foreground shadow-2xl outline-none">
+        <Dialog.Backdrop className="fixed inset-0 z-40 bg-foreground/35 backdrop-blur-sm" />
+        <Dialog.Viewport className="fixed inset-0 z-50 flex items-center justify-center p-5">
+          <Dialog.Popup className="flex max-h-[calc(100dvh-2.5rem)] w-full max-w-lg flex-col gap-5 overflow-y-auto rounded-3xl bg-card p-7 text-card-foreground shadow-2xl outline-none">
             <Dialog.Title className="text-xl font-semibold">
               Choose a subject
             </Dialog.Title>

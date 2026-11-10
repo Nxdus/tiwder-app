@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import DiscoverHeader from "@/components/navigation/discover-header";
+import DiscoverHeader from "@/components/student/discover-header";
 import { AuthGate, useAuth } from "@/components/auth/auth-provider";
 import BookingList from "@/components/bookings/booking-list";
 import { api, ApiError, type PublicTutor, type Subject } from "@/lib/api";
-import type { SearchOption, Tutor } from "@/lib/discover/tutors";
+import type { SearchOption, Tutor } from "@/lib/student/tutors";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Empty,
@@ -16,12 +16,12 @@ import {
   EmptyDescription,
 } from "@/components/ui/empty";
 import { Button } from "@/components/ui/button";
-import SubjectSearch from "./subject-search";
-import TutorSwipeCard from "./tutor-swipe-card";
-import ChooseSubjectDialog from "./choose-subject-dialog";
+import SubjectSearch from "./discover/subject-search";
+import TutorSwipeCard from "./discover/tutor-swipe-card";
+import ChooseSubjectDialog from "./discover/choose-subject-dialog";
 import { BookingListSkeleton, TutorCardSkeleton } from "@/components/loading/skeletons";
 
-export default function Discover() {
+export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" | "Matched" }) {
   const router = useRouter();
   const { session, refresh: refreshSession } = useAuth();
   const [tutors, setTutors] = useState<Tutor[]>([]);
@@ -30,7 +30,6 @@ export default function Discover() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [index, setIndex] = useState(0);
-  const [tab, setTab] = useState("Discover");
   const [query, setQuery] = useState("");
   const [selectedSearch, setSelectedSearch] = useState<SearchOption[]>([]);
   const [details, setDetails] = useState(false);
@@ -156,7 +155,7 @@ export default function Discover() {
         session.csrfToken,
       );
       setPendingTutor(null);
-      setTab("Offered");
+      router.push("/student/offered");
       setDetails(false);
       setBookingDetail(false);
     } catch (cause) {
@@ -175,7 +174,7 @@ export default function Discover() {
         tab={tab}
         onTabChange={(item) => {
           if (item === "Discover" || requireStudent()) {
-            setTab(item);
+            router.push(`/student/${item.toLowerCase()}`);
             setDetails(false);
             setBookingDetail(false);
           }
@@ -286,7 +285,7 @@ export default function Discover() {
           <BookingList
             key={tab}
             kind={tab === "Matched" ? "matches" : "interests"}
-            onConfirmed={() => setTab("Matched")}
+            onConfirmed={() => router.push("/student/matched")}
             query={selectedSearch.length ? "" : query}
             subjectIds={
               selectedSearch.length
