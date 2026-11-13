@@ -7,7 +7,7 @@ import { useState, type ReactNode } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import PhotoIndicators from "@/components/discover/photo-indicators";
+import PhotoIndicators from "@/components/ui/photo-indicators";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { Student } from "@/lib/tutor/students";

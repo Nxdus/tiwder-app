@@ -10,10 +10,10 @@ import {
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import StudentCard from "@/components/tutor/student-card";
-import TutorSwipeCard from "@/components/discover/tutor-swipe-card";
-import TutorPhoto from "@/components/discover/tutor-photo";
+import TutorSwipeCard from "@/components/student/discover/tutor-swipe-card";
+import TutorPhoto from "@/components/student/discover/tutor-photo";
 import { BookingListSkeleton } from "@/components/loading/skeletons";
-import OfferConfirmationDialog from "@/components/discover/offer-confirmation-dialog";
+import OfferConfirmationDialog from "@/components/student/discover/offer-confirmation-dialog";
 import {
   api,
   ApiError,
@@ -22,7 +22,7 @@ import {
   type Match,
   type Proposal,
 } from "@/lib/api";
-import type { Tutor } from "@/lib/discover/tutors";
+import type { Tutor } from "@/lib/student/tutors";
 import type { Student } from "@/lib/tutor/students";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

@@ -1,7 +1,7 @@
 "use client";
 
 import { LoadingImage } from "@/components/ui/loading-image";
-import type { Tutor } from "@/lib/discover/tutors";
+import type { Tutor } from "@/lib/student/tutors";
 
 export default function TutorPhoto({
   tutor,

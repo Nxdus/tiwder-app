@@ -32,8 +32,8 @@ export default function Login() {
       }}
     >
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 bg-foreground/40 backdrop-blur-sm" />
-        <Dialog.Viewport className="fixed inset-0 flex items-center justify-center overflow-y-auto p-4 sm:p-6">
+        <Dialog.Backdrop className="fixed inset-0 z-40 bg-foreground/40 backdrop-blur-sm" />
+        <Dialog.Viewport className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4 sm:p-6">
           <Dialog.Popup className="relative my-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col gap-6 overflow-y-auto rounded-3xl bg-card p-6 text-card-foreground shadow-2xl outline-none sm:p-8">
             <Dialog.Close
               aria-label="Close sign in"

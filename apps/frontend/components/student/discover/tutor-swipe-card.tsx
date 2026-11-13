@@ -17,10 +17,10 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import type { Tutor } from "@/lib/discover/tutors";
+import type { Tutor } from "@/lib/student/tutors";
 import { formatMinutes, type Proposal } from "@/lib/api";
 import TutorPhoto from "./tutor-photo";
-import PhotoIndicators from "./photo-indicators";
+import PhotoIndicators from "@/components/ui/photo-indicators";
 
 export default function TutorSwipeCard({
   tutor,
@@ -130,7 +130,7 @@ export default function TutorSwipeCard({
       className="mx-auto mt-8 w-full max-w-[330px]"
       aria-label="Discover tutors"
     >
-      {details && openedTutor && showBack && (
+      {details && showBack && (
         <Button
           variant="ghost"
           onClick={() => {
@@ -139,7 +139,7 @@ export default function TutorSwipeCard({
           className="mb-4 h-auto justify-start gap-2 p-0 text-sm font-normal"
         >
           <ArrowLeft className="size-4" />
-          Back to {tab === "Matched" ? "matched" : "offered"}
+          Back to {tab === "Discover" ? "discover" : tab === "Matched" ? "matched" : "offered"}
         </Button>
       )}
       <div className="[perspective:1400px]">
@@ -183,7 +183,7 @@ export default function TutorSwipeCard({
             >
               <TutorPhoto tutor={tutor} photoIndex={photoIndex} />
               <PhotoIndicators activeIndex={photoIndex} count={photoCount} />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-5 pt-20 text-white">
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-5 pt-32 text-white">
                 <h2 className="text-xl font-semibold">
                   {tutor.name}{" "}
                   <span className="ml-3 font-normal">{tutor.age}</span>
@@ -196,8 +196,7 @@ export default function TutorSwipeCard({
                   <BadgeDollarSign className="size-5" />฿ {tutor.rate} / hr
                 </p>
                 <div
-                  className="mt-2 flex touch-pan-x gap-2 overflow-x-auto"
-                  tabIndex={0}
+                  className="mt-2 flex flex-wrap gap-2"
                   aria-label="Subjects"
                   onPointerDown={(event) => event.stopPropagation()}
                   onKeyDown={(event) => event.stopPropagation()}
@@ -205,7 +204,7 @@ export default function TutorSwipeCard({
                   {tutor.subjects.map((subject) => (
                     <span
                       key={subject.name}
-                      className="shrink-0 whitespace-nowrap rounded-full border border-primary/20 bg-[color-mix(in_srgb,var(--primary)_20%,var(--background))] px-2 py-1 text-xs text-primary-foreground"
+                      className="max-w-full rounded-full border border-primary/20 bg-[color-mix(in_srgb,var(--primary)_20%,var(--background))] px-2 py-1 text-xs text-primary-foreground [overflow-wrap:anywhere]"
                     >
                       {subject.name}
                     </span>

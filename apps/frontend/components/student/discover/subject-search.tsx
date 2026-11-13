@@ -3,7 +3,7 @@
 import { BookOpen, Check, ListFilter, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import type { SearchOption, Tutor } from "@/lib/discover/tutors";
+import type { SearchOption, Tutor } from "@/lib/student/tutors";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LoadingRegion } from "@/components/loading/skeletons";
 
@@ -177,7 +177,7 @@ export default function SubjectSearch({
     <section
       aria-hidden={hidden || undefined}
       inert={hidden || undefined}
-      className={`mx-auto mt-8 w-full max-w-[352px] ${hidden ? "invisible" : ""}`}
+      className={`mx-auto mt-8 w-full max-w-[352px] ${hidden ? "hidden" : ""}`}
     >
       <div ref={searchRef} className="relative">
         <div className="flex h-12 items-center gap-2 rounded-2xl border border-input bg-background px-3 shadow-xs transition-shadow focus-within:border-ring focus-within:ring-4 focus-within:ring-ring/10">
