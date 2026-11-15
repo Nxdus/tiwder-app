@@ -25,7 +25,7 @@ import {
   skill,
   subjects,
   categories,
-  subjectCategories,
+  contains,
 } from './database/schema.js';
 export function parse<T>(schema: z.ZodType<T>, body: unknown): T {
   const result = schema.safeParse(body);
@@ -83,8 +83,8 @@ export class ProfileService {
         category: categories.name,
       })
       .from(subjects)
-      .leftJoin(subjectCategories, eq(subjects.id, subjectCategories.subjectId))
-      .leftJoin(categories, eq(categories.id, subjectCategories.categoryId))
+      .leftJoin(contains, eq(subjects.id, contains.subjectId))
+      .leftJoin(categories, eq(categories.id, contains.categoryId))
       .orderBy(asc(subjects.name), asc(categories.name));
     const catalog = new Map<
       string,

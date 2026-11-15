@@ -25,7 +25,7 @@ import {
   tutors,
   subjects,
   teachings,
-  interests,
+  swipes,
   timeSlots,
   matches,
 } from './database/schema.js';
@@ -109,13 +109,13 @@ async function settleMatches(tx: Tx, ids: string[]) {
 }
 async function expire(tx: Tx, ids: string[]) {
   await tx
-    .update(interests)
+    .update(swipes)
     .set({ status: 'expired', updatedAt: new Date() })
     .where(
       and(
-        eq(interests.status, 'proposed'),
-        or(inArray(interests.studentId, ids), inArray(interests.tutorId, ids)),
-        sql`((${interests.date}::timestamp + ${interests.start} * interval '1 minute') at time zone 'Asia/Bangkok') <= clock_timestamp()`,
+        eq(swipes.status, 'proposed'),
+        or(inArray(swipes.studentId, ids), inArray(swipes.tutorId, ids)),
+        sql`((${swipes.date}::timestamp + ${swipes.start} * interval '1 minute') at time zone 'Asia/Bangkok') <= clock_timestamp()`,
       ),
     );
 }
@@ -170,7 +170,7 @@ export class BookingService {
       if (!offer || !offer.hourlyRate)
         throw new NotFoundException('Teaching not found');
       const [row] = await tx
-        .insert(interests)
+        .insert(swipes)
         .values({
           ...offer,
           hourlyRate: offer.hourlyRate,
@@ -179,7 +179,7 @@ export class BookingService {
           tutorId,
           subjectId,
         })
-        .returning({ id: interests.id });
+        .returning({ id: swipes.id });
       return row;
     });
   }
@@ -188,10 +188,10 @@ export class BookingService {
       await expire(tx, [user.id]);
       const rows = await tx
         .select()
-        .from(interests)
+        .from(swipes)
         .where(
           eq(
-            user.role === 'student' ? interests.studentId : interests.tutorId,
+            user.role === 'student' ? swipes.studentId : swipes.tutorId,
             user.id,
           ),
         );
@@ -210,16 +210,16 @@ export class BookingService {
       throw new NotFoundException();
     return this.transaction(async (tx) => {
       const own = eq(
-        user.role === 'student' ? interests.studentId : interests.tutorId,
+        user.role === 'student' ? swipes.studentId : swipes.tutorId,
         user.id,
       );
-      const where = and(eq(interests.id, id), own);
-      const [initial] = await tx.select().from(interests).where(where);
+      const where = and(eq(swipes.id, id), own);
+      const [initial] = await tx.select().from(swipes).where(where);
       if (!initial) throw new NotFoundException();
       await lockPair(tx, initial.studentId, initial.tutorId);
       const [row] = await tx
         .select()
-        .from(interests)
+        .from(swipes)
         .where(where)
         .for('update');
       if (row.status !== 'pending' && row.status !== 'proposed')
@@ -266,6 +266,7 @@ export class BookingService {
             end: row.end,
             startsAt: slotTime(row.date, row.start),
             endsAt: slotTime(row.date, row.end),
+            status: 'booked',
           })
           .returning({ id: timeSlots.id });
         const [match] = await tx
@@ -278,18 +279,18 @@ export class BookingService {
           })
           .returning({ id: matches.id });
         await tx
-          .update(interests)
+          .update(swipes)
           .set({ status: 'confirmed', updatedAt: new Date() })
           .where(where);
         await tx
-          .update(interests)
+          .update(swipes)
           .set({ status: 'closed', updatedAt: new Date() })
           .where(
             and(
-              inArray(interests.status, [...live]),
+              inArray(swipes.status, [...live]),
               or(
-                eq(interests.studentId, row.studentId),
-                eq(interests.tutorId, row.tutorId),
+                eq(swipes.studentId, row.studentId),
+                eq(swipes.tutorId, row.tutorId),
               ),
             ),
           );
@@ -303,7 +304,7 @@ export class BookingService {
         if (slotTime(p.date, p.start).getTime() <= Date.now())
           throw new BadRequestException('Start must be in the future');
         await tx
-          .update(interests)
+          .update(swipes)
           .set({ ...p, status: 'proposed', updatedAt: new Date() })
           .where(where);
       } else {
@@ -321,7 +322,7 @@ export class BookingService {
             'Interest cannot be rejected in this state',
           );
         await tx
-          .update(interests)
+          .update(swipes)
           .set({
             status: action === 'withdraw' ? 'withdrawn' : 'rejected',
             updatedAt: new Date(),
@@ -338,14 +339,14 @@ export class BookingService {
         .select({
           id: matches.id,
           status: matches.status,
-          studentId: interests.studentId,
-          studentName: interests.studentName,
-          tutorId: interests.tutorId,
-          tutorName: interests.tutorName,
-          subjectId: interests.subjectId,
-          subjectName: interests.subjectName,
-          skillLevel: interests.skillLevel,
-          hourlyRate: interests.hourlyRate,
+          studentId: swipes.studentId,
+          studentName: swipes.studentName,
+          tutorId: swipes.tutorId,
+          tutorName: swipes.tutorName,
+          subjectId: swipes.subjectId,
+          subjectName: swipes.subjectName,
+          skillLevel: swipes.skillLevel,
+          hourlyRate: swipes.hourlyRate,
           date: timeSlots.date,
           start: timeSlots.start,
           end: timeSlots.end,
@@ -355,7 +356,7 @@ export class BookingService {
           updatedAt: matches.updatedAt,
         })
         .from(matches)
-        .innerJoin(interests, eq(interests.id, matches.interestId))
+        .innerJoin(swipes, eq(swipes.id, matches.interestId))
         .innerJoin(timeSlots, eq(timeSlots.id, matches.timeSlotId))
         .innerJoin(
           users,
@@ -426,7 +427,7 @@ export class BookingController {
     @Inject(AuthService) private readonly auth: AuthService,
     @Inject(BookingService) private readonly booking: BookingService,
   ) {}
-  @Get('interests') @Header('Cache-Control', 'no-store') async interests(
+  @Get('interests') @Header('Cache-Control', 'no-store') async swipes(
     @Req() req: Request,
   ) {
     return this.booking.list(await this.auth.require(req));
