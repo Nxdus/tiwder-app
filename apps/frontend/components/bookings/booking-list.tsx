@@ -33,12 +33,20 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from "@/components/ui/empty";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Lesson = Interest | Match;
 const labels: Record<string, string> = {
   pending: "Awaiting tutor",
   proposed: "Waiting Approve",
   confirmed: "Upcoming",
+  "in-progress": "In Progress",
   completed: "Completed",
   cancelled: "Cancelled",
   rejected: "Declined",
@@ -46,6 +54,13 @@ const labels: Record<string, string> = {
   closed: "Closed",
   expired: "Expired",
 };
+const statusOptions = [
+  { value: "all", label: "All" },
+  ...["confirmed", "in-progress", "completed", "cancelled"].map((value) => ({
+    value,
+    label: labels[value],
+  })),
+];
 const statusVariants: Record<string, ComponentProps<typeof Badge>["variant"]> = {
   pending: "warning",
   proposed: "warning",
@@ -149,6 +164,7 @@ function BookingListContent({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(0);
+  const [statusFilter, setStatusFilter] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<"accept" | "reject" | null>(
     null,
@@ -210,10 +226,24 @@ function BookingListContent({
       setBusy(false);
     }
   }
+  function future(item: Lesson) {
+    const p = proposalOf(item);
+    return (
+      p &&
+      now > 0 &&
+      new Date(`${p.date}T${formatMinutes(p.start)}:00+07:00`).getTime() > now
+    );
+  }
+  const lessonStatus = (item: Lesson) =>
+    item.status === "confirmed" && !future(item) ? "in-progress" : item.status;
+  const status = (item: Lesson) => labels[lessonStatus(item)] ?? item.status;
+  const showStatusFilter = kind === "matches" && role === "tutor";
+  const isFiltered = showStatusFilter && statusFilter !== "all";
   const visible = items.filter(
     (item) =>
       (!subjectIds || subjectIds.includes(item.subjectId)) &&
       (kind === "matches" || ["pending", "proposed"].includes(item.status)) &&
+      (!isFiltered || lessonStatus(item) === statusFilter) &&
       (!query.trim() ||
         [item.studentName, item.tutorName, item.subjectName].some((value) =>
           value.toLowerCase().includes(query.trim().toLowerCase()),
@@ -224,18 +254,7 @@ function BookingListContent({
     (selectedId === null && kind === "matches" && visible.length === 1
       ? visible[0]
       : null);
-  function future(item: Lesson) {
-    const p = proposalOf(item);
-    return (
-      p &&
-      now > 0 &&
-      new Date(`${p.date}T${formatMinutes(p.start)}:00+07:00`).getTime() > now
-    );
-  }
-  const status = (item: Lesson) =>
-    item.status === "confirmed" && !future(item)
-      ? "In Progress"
-      : (labels[item.status] ?? item.status);
+  const noMatchesForStatus = isFiltered && items.length > 0;
   return (
     <section
       aria-label={kind === "matches" ? "Your lessons" : "Lesson requests"}
@@ -248,16 +267,47 @@ function BookingListContent({
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+      {showStatusFilter && !loading && items.length > 0 && (
+        <div className="mb-6 flex flex-col items-start gap-2">
+          <label htmlFor="tutor-lesson-status" className="text-sm text-muted-foreground">
+            Filter by lesson status
+          </label>
+          <Select
+            items={statusOptions}
+            value={statusFilter}
+            onValueChange={(value) => setStatusFilter(value ?? "all")}
+          >
+            <SelectTrigger id="tutor-lesson-status" className="min-w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent
+              side="bottom"
+              alignItemWithTrigger={false}
+              collisionAvoidance={{ side: "none", align: "shift", fallbackAxisSide: "none" }}
+            >
+              {statusOptions.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       {loading ? (
         <BookingListSkeleton tutor={role === "tutor"} />
       ) : !visible.length ? (
         <Empty className="mx-auto max-w-md">
           <EmptyHeader>
             <EmptyTitle>
-              {error ? "Lessons could not be loaded" : kind === "matches" ? "No matches yet" : "No requests yet"}
+              {error ? "Lessons could not be loaded" : noMatchesForStatus
+                ? "No lessons with this status"
+                : kind === "matches" ? "No matches yet" : "No requests yet"}
             </EmptyTitle>
             <EmptyDescription>
-              {error ? "Please try again." : role === "tutor"
+              {error ? "Please try again." : noMatchesForStatus
+                ? "Choose another status to see more lessons."
+                : role === "tutor"
                 ? "Students will appear here after sending a request."
                 : "Find a tutor and choose a subject to get started."}
             </EmptyDescription>
