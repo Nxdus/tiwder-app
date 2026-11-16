@@ -33,7 +33,6 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
   const [query, setQuery] = useState("");
   const [selectedSearch, setSelectedSearch] = useState<SearchOption[]>([]);
   const [details, setDetails] = useState(false);
-  const [bookingDetail, setBookingDetail] = useState(false);
   const [pendingTutor, setPendingTutor] = useState<Tutor | null>(null);
   const hasData = useRef(false);
   const load = useCallback(async () => {
@@ -97,6 +96,12 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
       ),
     [subjects],
   );
+  const discoverChoices = useMemo(() => {
+    const taughtSubjectIds = new Set(
+      tutors.flatMap((tutor) => tutor.subjects.map((subject) => subject.id)),
+    );
+    return choices.filter((subject) => taughtSubjectIds.has(subject.id));
+  }, [choices, tutors]);
   const deck = useMemo(
     () =>
       tutors.filter((tutor) => {
@@ -157,7 +162,6 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
       setPendingTutor(null);
       router.push("/student/offered");
       setDetails(false);
-      setBookingDetail(false);
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Unable to send request.",
@@ -176,7 +180,6 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
           if (item === "Discover" || requireStudent()) {
             router.push(`/student/${item.toLowerCase()}`);
             setDetails(false);
-            setBookingDetail(false);
           }
         }}
       />
@@ -196,7 +199,7 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
         <>
           <SubjectSearch
             loading={loading}
-            choices={choices}
+            choices={discoverChoices}
             tab={tab}
             hidden={details}
             query={query}
@@ -268,39 +271,12 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
         </>
       ) : (
         <AuthGate role="student" fallback={<BookingListSkeleton />}>
-          {tab !== "Matched" && !bookingDetail && (
-            <SubjectSearch
-              loading={loading}
-              choices={choices}
-              tab={tab}
-              hidden={false}
-              query={query}
-              selectedSearch={selectedSearch}
-              onChange={(next, selected) => {
-                setQuery(next);
-                setSelectedSearch(selected);
-              }}
-            />
-          )}
           <BookingList
             key={tab}
             kind={tab === "Matched" ? "matches" : "interests"}
             onConfirmed={() => router.push("/student/matched")}
-            query={selectedSearch.length ? "" : query}
-            subjectIds={
-              selectedSearch.length
-                ? selectedSearch.flatMap((option) =>
-                    option.subject
-                      ? [option.subject.id]
-                      : choices
-                          .filter(
-                            (subject) => subject.category === option.category,
-                          )
-                          .map((subject) => subject.id),
-                  )
-                : undefined
-            }
-            onDetailChange={setBookingDetail}
+            offeredSubjectChoices={tab === "Offered" ? choices : undefined}
+            loadingOfferedSubjects={loading}
           />
         </AuthGate>
       )}
