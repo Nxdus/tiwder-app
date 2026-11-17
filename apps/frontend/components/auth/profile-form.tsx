@@ -473,6 +473,11 @@ export default function ProfileForm({
         </div>
         )}
       </div>
+      {!onboarding && (
+        <footer className="mt-8 pb-8 text-center text-sm text-muted-foreground">
+          <Link href="/privacy" className="underline underline-offset-4">Privacy Policy</Link>
+        </footer>
+      )}
     </main>
   );
 }
