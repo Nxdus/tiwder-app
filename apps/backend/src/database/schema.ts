@@ -35,6 +35,11 @@ export const matchStatus = pgEnum('match_status', [
   'completed',
   'cancelled',
 ]);
+export const timeSlotStatus = pgEnum('time_slot_status', [
+  'available',
+  'booked',
+  'cancelled',
+]);
 export const users = pgTable('users', {
   id: id(),
   googleSub: text('google_sub').unique().notNull(),
@@ -94,8 +99,8 @@ const subjectRef = () =>
   uuid('subject_id')
     .notNull()
     .references(() => subjects.id);
-export const subjectCategories = pgTable(
-  'subject_categories',
+export const contains = pgTable(
+  'contains',
   {
     subjectId: subjectRef(),
     categoryId: uuid('category_id')
@@ -113,8 +118,8 @@ export const teachings = pgTable(
   },
   (t) => [primaryKey({ columns: [t.tutorId, t.subjectId] })],
 );
-export const interests = pgTable(
-  'interests',
+export const swipes = pgTable(
+  'swipes',
   {
     id: id(),
     status: interestStatus().notNull().default('pending'),
@@ -156,6 +161,7 @@ export const timeSlots = pgTable('time_slots', {
   end: integer().notNull(),
   startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
   endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+  status: timeSlotStatus('slot_status').notNull().default('available'),
 });
 export const matches = pgTable(
   'matches',
@@ -164,7 +170,7 @@ export const matches = pgTable(
     interestId: uuid('interest_id')
       .notNull()
       .unique()
-      .references(() => interests.id),
+      .references(() => swipes.id),
     studentId: userRef('student_id'),
     tutorId: userRef('tutor_id'),
     timeSlotId: uuid('time_slot_id')
