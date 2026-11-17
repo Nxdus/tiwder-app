@@ -12,6 +12,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import StudentCard from "@/components/tutor/student-card";
 import TutorSwipeCard from "@/components/student/discover/tutor-swipe-card";
 import TutorPhoto from "@/components/student/discover/tutor-photo";
+import SubjectSearch from "@/components/student/discover/subject-search";
 import { BookingListSkeleton } from "@/components/loading/skeletons";
 import OfferConfirmationDialog from "@/components/student/discover/offer-confirmation-dialog";
 import {
@@ -22,7 +23,7 @@ import {
   type Match,
   type Proposal,
 } from "@/lib/api";
-import type { Tutor } from "@/lib/student/tutors";
+import type { SearchOption, Tutor } from "@/lib/student/tutors";
 import type { Student } from "@/lib/tutor/students";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,12 +34,20 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from "@/components/ui/empty";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Lesson = Interest | Match;
 const labels: Record<string, string> = {
   pending: "Awaiting tutor",
   proposed: "Waiting Approve",
   confirmed: "Upcoming",
+  "in-progress": "In Progress",
   completed: "Completed",
   cancelled: "Cancelled",
   rejected: "Declined",
@@ -46,6 +55,13 @@ const labels: Record<string, string> = {
   closed: "Closed",
   expired: "Expired",
 };
+const statusOptions = [
+  { value: "all", label: "All" },
+  ...["confirmed", "in-progress", "completed", "cancelled"].map((value) => ({
+    value,
+    label: labels[value],
+  })),
+];
 const statusVariants: Record<string, ComponentProps<typeof Badge>["variant"]> = {
   pending: "warning",
   proposed: "warning",
@@ -133,15 +149,13 @@ export default function BookingList(props: ComponentProps<typeof BookingListCont
 function BookingListContent({
   kind,
   onConfirmed,
-  query = "",
-  subjectIds,
-  onDetailChange,
+  offeredSubjectChoices,
+  loadingOfferedSubjects = false,
 }: {
   kind: "interests" | "matches";
   onConfirmed?: () => void;
-  query?: string;
-  subjectIds?: string[];
-  onDetailChange?: (open: boolean) => void;
+  offeredSubjectChoices?: Tutor["subjects"];
+  loadingOfferedSubjects?: boolean;
 }) {
   const { session, refresh: refreshSession } = useAuth();
   const [items, setItems] = useState<Lesson[]>([]);
@@ -149,6 +163,9 @@ function BookingListContent({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(0);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSearch, setSelectedSearch] = useState<SearchOption[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<"accept" | "reject" | null>(
     null,
@@ -210,20 +227,6 @@ function BookingListContent({
       setBusy(false);
     }
   }
-  const visible = items.filter(
-    (item) =>
-      (!subjectIds || subjectIds.includes(item.subjectId)) &&
-      (kind === "matches" || ["pending", "proposed"].includes(item.status)) &&
-      (!query.trim() ||
-        [item.studentName, item.tutorName, item.subjectName].some((value) =>
-          value.toLowerCase().includes(query.trim().toLowerCase()),
-        )),
-  );
-  const selected =
-    visible.find((item) => item.id === selectedId) ??
-    (selectedId === null && kind === "matches" && visible.length === 1
-      ? visible[0]
-      : null);
   function future(item: Lesson) {
     const p = proposalOf(item);
     return (
@@ -232,10 +235,37 @@ function BookingListContent({
       new Date(`${p.date}T${formatMinutes(p.start)}:00+07:00`).getTime() > now
     );
   }
-  const status = (item: Lesson) =>
-    item.status === "confirmed" && !future(item)
-      ? "In Progress"
-      : (labels[item.status] ?? item.status);
+  const lessonStatus = (item: Lesson) =>
+    item.status === "confirmed" && !future(item) ? "in-progress" : item.status;
+  const status = (item: Lesson) => labels[lessonStatus(item)] ?? item.status;
+  const showStatusFilter = kind === "matches" && role === "tutor";
+  const isFiltered = showStatusFilter && statusFilter !== "all";
+  const listedItems = kind === "interests"
+    ? items.filter((item) => item.status === "pending" || item.status === "proposed")
+    : items;
+  const offeredSubjectIds = new Set(listedItems.map((item) => item.subjectId));
+  const offeredChoices = offeredSubjectChoices?.filter((subject) =>
+    offeredSubjectIds.has(subject.id),
+  );
+  const activeSearch = selectedSearch.filter((option) =>
+    option.subject && offeredSubjectIds.has(option.subject.id),
+  );
+  const query = activeSearch.length ? "" : searchQuery.trim().toLowerCase();
+  const visible = listedItems.filter(
+    (item) =>
+      (!activeSearch.length || activeSearch.some((option) => option.subject?.id === item.subjectId)) &&
+      (!isFiltered || lessonStatus(item) === statusFilter) &&
+      (!query ||
+        [item.studentName, item.tutorName, item.subjectName].some((value) =>
+          value.toLowerCase().includes(query),
+        )),
+  );
+  const selected =
+    visible.find((item) => item.id === selectedId) ??
+    (selectedId === null && kind === "matches" && visible.length === 1
+      ? visible[0]
+      : null);
+  const noMatchesForStatus = isFiltered && items.length > 0;
   return (
     <section
       aria-label={kind === "matches" ? "Your lessons" : "Lesson requests"}
@@ -243,10 +273,51 @@ function BookingListContent({
         role === "tutor" ? "mx-auto w-full max-w-[1070px]" : "mx-auto w-full"
       }
     >
+      {offeredChoices && !selected && (
+        <SubjectSearch
+          tab="Offered"
+          hidden={false}
+          loading={loading || loadingOfferedSubjects}
+          choices={offeredChoices}
+          query={searchQuery}
+          selectedSearch={activeSearch}
+          onChange={(nextQuery, nextSelection) => {
+            setSearchQuery(nextQuery);
+            setSelectedSearch(nextSelection);
+          }}
+        />
+      )}
       {error && (
         <Alert variant="destructive" className="mx-auto mb-5 max-w-xl">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
+      )}
+      {showStatusFilter && !loading && items.length > 0 && (
+        <div className="mb-6 flex flex-col items-start gap-2">
+          <label htmlFor="tutor-lesson-status" className="text-sm text-muted-foreground">
+            Filter by lesson status
+          </label>
+          <Select
+            items={statusOptions}
+            value={statusFilter}
+            onValueChange={(value) => setStatusFilter(value ?? "all")}
+          >
+            <SelectTrigger id="tutor-lesson-status" className="min-w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent
+              side="bottom"
+              alignItemWithTrigger={false}
+              collisionAvoidance={{ side: "none", align: "shift", fallbackAxisSide: "none" }}
+            >
+              {statusOptions.map(({ value, label }) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       )}
       {loading ? (
         <BookingListSkeleton tutor={role === "tutor"} />
@@ -254,10 +325,14 @@ function BookingListContent({
         <Empty className="mx-auto max-w-md">
           <EmptyHeader>
             <EmptyTitle>
-              {error ? "Lessons could not be loaded" : kind === "matches" ? "No matches yet" : "No requests yet"}
+              {error ? "Lessons could not be loaded" : noMatchesForStatus
+                ? "No lessons with this status"
+                : kind === "matches" ? "No matches yet" : "No requests yet"}
             </EmptyTitle>
             <EmptyDescription>
-              {error ? "Please try again." : role === "tutor"
+              {error ? "Please try again." : noMatchesForStatus
+                ? "Choose another status to see more lessons."
+                : role === "tutor"
                 ? "Students will appear here after sending a request."
                 : "Find a tutor and choose a subject to get started."}
             </EmptyDescription>
@@ -321,10 +396,7 @@ function BookingListContent({
             openedTutor
             selectedSubjects={[selected.subjectName]}
             onDetailsChange={() => {}}
-            onBack={() => {
-              setSelectedId("");
-              onDetailChange?.(false);
-            }}
+            onBack={() => setSelectedId("")}
             onPass={() => {}}
             onMatch={() => {}}
             onAccept={() => setConfirmation("accept")}
@@ -384,10 +456,7 @@ function BookingListContent({
                 <button
                   type="button"
                   aria-label={`${item.tutorName}, ${status(item)}${p ? `, ${p.date}, ${formatMinutes(p.start)}–${formatMinutes(p.end)}` : ", Schedule not set"}`}
-                  onClick={() => {
-                    setSelectedId(item.id);
-                    onDetailChange?.(true);
-                  }}
+                  onClick={() => setSelectedId(item.id)}
                   className="group relative block h-[270px] w-[152px] overflow-hidden rounded-2xl bg-secondary text-left text-foreground ring-1 ring-border transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   <TutorPhoto tutor={tutorOf(item)} />
