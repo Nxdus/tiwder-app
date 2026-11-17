@@ -1,4 +1,36 @@
 services:
+  front:
+    build:
+      context: ./apps/frontend
+      args:
+        BACKEND_URL: http://back:3001
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      BACKEND_URL: http://back:3001
+    expose:
+      - "3000"
+    depends_on:
+      - back
+
+  back:
+    build:
+      context: ./apps/backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-tiwder}:${POSTGRES_PASSWORD:-tiwder}@postgres:5432/${POSTGRES_DB:-tiwder}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:3000/api/auth/google/callback}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+    expose:
+      - "3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
