@@ -89,6 +89,9 @@ export default function Login() {
               We use your name, email, and profile photo. Your Gmail messages
               stay private.
             </p>
+            <Link href="/privacy" className="text-center text-sm underline underline-offset-4">
+              Privacy Policy
+            </Link>
             <Link
               href="/"
               className="text-center text-sm font-medium text-primary-foreground underline-offset-4 hover:underline"
