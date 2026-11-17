@@ -280,9 +280,6 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
           />
         </AuthGate>
       )}
-      <footer className="mt-8 text-center text-sm text-muted-foreground">
-        <Link href="/privacy" className="underline underline-offset-4">Privacy Policy</Link>
-      </footer>
     </main>
   );
 }

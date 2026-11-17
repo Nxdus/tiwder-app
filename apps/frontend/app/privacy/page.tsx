@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 export const metadata: Metadata = { title: "Privacy Policy | Tiwder" };
@@ -7,9 +8,14 @@ export const metadata: Metadata = { title: "Privacy Policy | Tiwder" };
 export default function PrivacyPage() {
   return (
     <main lang="en" className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
+      <Link
+        href="/"
+        className="mb-8 flex w-fit items-center gap-2 self-start text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ArrowLeft className="size-4" /> Back to Tiwder
+      </Link>
       <Card>
         <CardHeader>
-          <Link href="/" className="w-fit underline underline-offset-4">Tiwder home</Link>
           <h1 className="text-3xl font-semibold">Privacy Policy</h1>
           <p className="text-muted-foreground">Last updated: November 17, 2026</p>
         </CardHeader>
