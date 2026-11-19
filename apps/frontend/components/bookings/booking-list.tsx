@@ -68,7 +68,7 @@ const statusOptions = [
 ];
 const statusVariants: Record<string, ComponentProps<typeof Badge>["variant"]> = {
   pending: "warning",
-  proposed: "warning",
+  proposed: "info",
   confirmed: "info",
   completed: "success",
   cancelled: "destructive",
@@ -324,7 +324,7 @@ function BookingListContent({
   const lessonStatus = (item: Lesson) =>
     item.status === "confirmed" && !future(item) ? "in-progress" : item.status;
   const status = (item: Lesson) => labels[lessonStatus(item)] ?? item.status;
-  const showStatusFilter = kind === "matches" && role === "tutor";
+  const showStatusFilter = kind === "matches";
   const isFiltered = showStatusFilter && statusFilter !== "all";
   const listedItems = kind === "interests"
     ? items.filter((item) => item.status === "pending" || item.status === "proposed")
@@ -363,7 +363,9 @@ function BookingListContent({
     <section
       aria-label={kind === "matches" ? "Your lessons" : "Lesson requests"}
       className={
-        role === "tutor" ? "mx-auto w-full max-w-[1070px]" : "mx-auto w-full"
+        role === "tutor"
+          ? "mx-auto w-full max-w-[1070px]"
+          : kind === "matches" ? "mx-auto w-full pt-8" : "mx-auto w-full"
       }
     >
       {offeredChoices && !selected && (
