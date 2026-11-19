@@ -68,7 +68,7 @@ const statusOptions = [
 ];
 const statusVariants: Record<string, ComponentProps<typeof Badge>["variant"]> = {
   pending: "warning",
-  proposed: "warning",
+  proposed: "info",
   confirmed: "info",
   completed: "success",
   cancelled: "destructive",
