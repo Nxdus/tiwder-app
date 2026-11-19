@@ -5,6 +5,7 @@ import {
   BadgeDollarSign,
   BanknoteArrowUp,
   Check,
+  ChevronDown,
   CircleAlert,
   Clock,
   Gauge,
@@ -68,10 +69,21 @@ export default function TutorSwipeCard({
   const [isResettingCard, setIsResettingCard] = useState(false);
   const [cardVersion, setCardVersion] = useState(0);
   const [photoSelection, setPhotoSelection] = useState({ tutor: "", index: 0 });
+  const [aboutToggle, setAboutToggle] = useState({ tutor: "", expanded: false });
+  const [truncatedTutor, setTruncatedTutor] = useState({
+    tutor: "",
+    truncated: false,
+  });
   const startX = useRef<number | null>(null);
   const dragXRef = useRef(0);
   const timeoutRef = useRef<number | undefined>(undefined);
   const frameRef = useRef<number | undefined>(undefined);
+  const aboutRef = useRef<HTMLParagraphElement | null>(null);
+  const aboutExpanded =
+    aboutToggle.tutor === tutor.id && aboutToggle.expanded;
+  const isAboutTruncated =
+    truncatedTutor.tutor === tutor.id && truncatedTutor.truncated;
+  const cardHeightClass = tab === "Matched" ? "h-[645px]" : "h-[587px]";
   useEffect(
     () => () => {
       window.clearTimeout(timeoutRef.current);
@@ -80,6 +92,27 @@ export default function TutorSwipeCard({
     },
     [],
   );
+  useEffect(() => {
+    const element = aboutRef.current;
+    if (!element || aboutExpanded) return;
+
+    const measure = () => {
+      const next = element.scrollHeight > element.clientHeight + 1;
+      setTruncatedTutor((previous) =>
+        previous.tutor === tutor.id && previous.truncated === next
+          ? previous
+          : { tutor: tutor.id, truncated: next },
+      );
+    };
+
+    const frame = requestAnimationFrame(measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [tutor.id, tutor.about, aboutExpanded, details]);
   const passProgress = Math.min(Math.max(-dragX / 90, 0), 1) * 100;
   const matchProgress = Math.min(Math.max(dragX / 90, 0), 1) * 100;
   const photoCount = tutor.photos?.length || 1;
@@ -106,6 +139,7 @@ export default function TutorSwipeCard({
       setIsResettingCard(true);
       onPass();
       setPhotoSelection({ tutor: "", index: 0 });
+      setAboutToggle({ tutor: "", expanded: false });
       setCardVersion((version) => version + 1);
       dragXRef.current = 0;
       setDragX(0);
@@ -183,7 +217,7 @@ export default function TutorSwipeCard({
                   changePhoto(event.key === "ArrowLeft" ? -1 : 1);
                 }
               }}
-              className={`relative [grid-area:1/1] ${tab === "Matched" ? "min-h-[645px]" : "min-h-[587px]"} overflow-hidden rounded-2xl bg-secondary transition-transform duration-700 [backface-visibility:hidden] ${details ? "[transform:rotateY(180deg)]" : ""}`}
+              className={`relative [grid-area:1/1] ${cardHeightClass} overflow-hidden rounded-2xl bg-secondary transition-transform duration-700 [backface-visibility:hidden] ${details ? "[transform:rotateY(180deg)]" : ""}`}
             >
               <TutorPhoto tutor={tutor} photoIndex={photoIndex} />
               <PhotoIndicators activeIndex={photoIndex} count={photoCount} />
@@ -224,12 +258,12 @@ export default function TutorSwipeCard({
               style={{
                 transform: details ? "rotateY(0deg)" : "rotateY(180deg)",
               }}
-              className={`${details ? "relative" : "absolute inset-0"} [grid-area:1/1] flex flex-col overflow-hidden rounded-2xl bg-card text-card-foreground transition-transform duration-700 [backface-visibility:hidden]`}
+              className={`${details ? "relative" : "absolute inset-0"} [grid-area:1/1] ${cardHeightClass} flex flex-col overflow-hidden rounded-2xl bg-card text-card-foreground transition-transform duration-700 [backface-visibility:hidden]`}
             >
               <div
                 role="group"
                 aria-label="Tutor photos"
-                className="relative h-[230px] shrink-0 overflow-hidden"
+                className="relative h-[200px] shrink-0 overflow-hidden"
               >
                 <button
                   type="button"
@@ -272,7 +306,7 @@ export default function TutorSwipeCard({
                   </div>
                 )}
               </div>
-              <div className="shrink-0 p-4 text-sm leading-relaxed text-muted-foreground">
+              <div className="min-h-0 flex-1 overflow-y-auto p-4 text-sm leading-relaxed text-muted-foreground">
                 <div className="flex items-center justify-between gap-2">
                   <h2 className="min-w-0 text-xl font-semibold text-foreground">
                     {tutor.name}{" "}
@@ -286,7 +320,7 @@ export default function TutorSwipeCard({
                     </Badge>
                   )}
                 </div>
-                <div className="mt-3 space-y-3">
+                <div className="mt-2.5 space-y-2">
                   <p className="flex items-center gap-2">
                     <GraduationCap className="size-4" />
                     {tutor.school}
@@ -299,12 +333,38 @@ export default function TutorSwipeCard({
                     {tutor.experience}
                   </p>
                 </div>
-                <div className="my-4 border-t border-border" />
+                <div className="my-3 border-t border-border" />
                 <h3 className="text-base font-semibold text-foreground">
                   About
                 </h3>
-                <p className="mt-2 leading-relaxed">{tutor.about}</p>
-                <div className="my-4 border-t border-border" />
+                <p
+                  ref={aboutRef}
+                  className={`mt-1.5 leading-relaxed whitespace-pre-wrap ${aboutExpanded ? "" : "line-clamp-2"}`}
+                >
+                  {tutor.about}
+                </p>
+                {(isAboutTruncated || aboutExpanded) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    aria-expanded={aboutExpanded}
+                    onClick={() =>
+                      setAboutToggle({
+                        tutor: tutor.id,
+                        expanded: !aboutExpanded,
+                      })
+                    }
+                    className="mt-1 h-auto gap-1 px-0 py-0.5 text-xs font-medium text-foreground hover:bg-transparent hover:underline"
+                  >
+                    {aboutExpanded ? "Show less" : "Show more"}
+                    <ChevronDown
+                      aria-hidden="true"
+                      className={`size-3.5 transition-transform duration-200 ${aboutExpanded ? "rotate-180" : ""}`}
+                    />
+                  </Button>
+                )}
+                <div className="my-3 border-t border-border" />
                 <h3 className="text-base font-semibold text-foreground">
                   Subject
                 </h3>
@@ -314,7 +374,7 @@ export default function TutorSwipeCard({
                       !openedTutor || selectedSubjects.includes(subject.name),
                   )
                   .map((subject) => (
-                    <div key={subject.name} className="mt-3">
+                    <div key={subject.name} className="mt-2">
                       <p className="text-xs font-medium">{subject.name}</p>
                       <p className="mt-1 flex items-center gap-1">
                         <Gauge className="size-4" />
@@ -324,15 +384,15 @@ export default function TutorSwipeCard({
                   ))}
                 {tab === "Matched" && (
                   <>
-                    <div className="my-4 border-t border-border" />
+                    <div className="my-3 border-t border-border" />
                     <h3 className="text-base font-semibold text-foreground">
                       Contact
                     </h3>
-                    <p className="mt-3 flex items-center gap-2">
+                    <p className="mt-2 flex items-center gap-2">
                       <Phone className="size-4" />
                       {contact?.phone ?? "Available after confirmation"}
                     </p>
-                    <p className="mt-3 flex items-center gap-2">
+                    <p className="mt-2 flex items-center gap-2">
                       <Mail className="size-4" />
                       {contact?.email ?? "Available after confirmation"}
                     </p>

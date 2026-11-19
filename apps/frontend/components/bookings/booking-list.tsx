@@ -2,8 +2,12 @@
 
 import {
   CalendarDays,
-  Clock,
   CircleAlert,
+  CircleCheck,
+  CircleMinus,
+  CirclePlay,
+  CircleX,
+  Clock,
   BanknoteArrowUp,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
@@ -35,13 +39,7 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from "@/components/ui/empty";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 type Lesson = Interest | Match;
 const labels: Record<string, string> = {
@@ -74,6 +72,25 @@ const statusVariants: Record<string, ComponentProps<typeof Badge>["variant"]> = 
   closed: "secondary",
   expired: "secondary",
 } as const;
+function StatusIcon({ status }: { status: string }) {
+  switch (status) {
+    case "pending":
+      return <Clock aria-hidden="true" className="shrink-0" />;
+    case "in-progress":
+      return <CirclePlay aria-hidden="true" className="shrink-0" />;
+    case "completed":
+      return <CircleCheck aria-hidden="true" className="shrink-0" />;
+    case "cancelled":
+    case "rejected":
+      return <CircleX aria-hidden="true" className="shrink-0" />;
+    case "withdrawn":
+    case "closed":
+    case "expired":
+      return <CircleMinus aria-hidden="true" className="shrink-0" />;
+    default:
+      return <CircleAlert aria-hidden="true" className="shrink-0" />;
+  }
+}
 export const proposalOf = (item: Lesson): Proposal | null =>
   "proposal" in item ? item.proposal : item;
 export function studentOf(item: Lesson): Student {
@@ -304,6 +321,13 @@ function BookingListContent({
       ? visible[0]
       : null);
   const noMatchesForStatus = isFiltered && items.length > 0;
+  const statusCounts = showStatusFilter
+    ? listedItems.reduce<Record<string, number>>((counts, item) => {
+        const key = lessonStatus(item);
+        counts[key] = (counts[key] ?? 0) + 1;
+        return counts;
+      }, {})
+    : {};
   return (
     <section
       aria-label={kind === "matches" ? "Your lessons" : "Lesson requests"}
@@ -331,30 +355,44 @@ function BookingListContent({
         </Alert>
       )}
       {showStatusFilter && !loading && items.length > 0 && (
-        <div className="mb-6 flex flex-col items-start gap-2">
-          <label htmlFor="tutor-lesson-status" className="text-sm text-muted-foreground">
-            Filter by lesson status
-          </label>
-          <Select
-            items={statusOptions}
-            value={statusFilter}
-            onValueChange={(value) => setStatusFilter(value ?? "all")}
-          >
-            <SelectTrigger id="tutor-lesson-status" className="min-w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent
-              side="bottom"
-              alignItemWithTrigger={false}
-              collisionAvoidance={{ side: "none", align: "shift", fallbackAxisSide: "none" }}
-            >
-              {statusOptions.map(({ value, label }) => (
-                <SelectItem key={value} value={value}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div
+          role="group"
+          aria-label="Filter by lesson status"
+          className="mx-auto mb-8 flex flex-wrap items-center justify-center gap-2 sm:w-fit sm:flex-nowrap sm:gap-1 sm:rounded-full sm:border sm:border-border/70 sm:bg-muted/50 sm:p-1"
+        >
+          {statusOptions.map(({ value, label }) => {
+            const active = statusFilter === value;
+            const count =
+              value === "all" ? listedItems.length : (statusCounts[value] ?? 0);
+            return (
+              <Button
+                key={value}
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-pressed={active}
+                onClick={() => setStatusFilter(value)}
+                className={cn(
+                  "h-9 rounded-full px-3.5 text-sm font-medium transition-colors sm:h-8",
+                  active
+                    ? "bg-foreground text-background shadow-xs hover:bg-foreground/90 hover:text-background"
+                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80 sm:bg-transparent sm:text-muted-foreground sm:hover:bg-background/80 sm:hover:text-foreground",
+                )}
+              >
+                <span>{label}</span>
+                {count > 0 && (
+                  <span
+                    className={cn(
+                      "text-xs tabular-nums",
+                      active ? "text-background/75" : "text-muted-foreground",
+                    )}
+                  >
+                    {count}
+                  </span>
+                )}
+              </Button>
+            );
+          })}
         </div>
       )}
       {loading ? (
@@ -534,9 +572,10 @@ function BookingListContent({
                     </div>
                     <Badge
                       variant={statusVariants[item.status] ?? "secondary"}
-                      className="h-auto max-w-full whitespace-normal py-1 text-[11px] leading-4 [text-shadow:none]"
+                      className="h-auto max-w-full gap-1 whitespace-normal py-1 text-[11px] leading-4 [text-shadow:none]"
                     >
-                      {status(item)}
+                      <StatusIcon status={lessonStatus(item)} />
+                      <span>{status(item)}</span>
                     </Badge>
                   </div>
                 </button>
