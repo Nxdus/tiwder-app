@@ -8,10 +8,10 @@ import { ShieldCheck, X } from "lucide-react";
 import { useAuth } from "./auth-provider";
 import { roleHome } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { LoadingRegion } from "@/components/loading/skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/toast";
 
 export default function Login() {
   const { session, loading } = useAuth();
@@ -23,6 +23,16 @@ export default function Login() {
         session.user.onboarded ? roleHome(session.user.role) : "/onboarding",
       );
   }, [session.user, router]);
+
+  useEffect(() => {
+    if (search.has("error")) {
+      toast.add({
+        title: "Sign in failed",
+        description: "Google sign-in could not be completed. Please try again.",
+        type: "error",
+      });
+    }
+  }, [search]);
 
   return (
     <Dialog.Root
@@ -52,13 +62,6 @@ export default function Login() {
               </Dialog.Description>
             </div>
 
-            {search.has("error") && (
-              <Alert variant="destructive">
-                <AlertDescription>
-                  Google sign-in could not be completed. Please try again.
-                </AlertDescription>
-              </Alert>
-            )}
 
             {loading ? (
               <LoadingRegion label="Loading account…"><Skeleton className="h-12 w-full rounded-4xl" /></LoadingRegion>

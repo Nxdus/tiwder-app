@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { api, bangkokToday, type Interest } from "@/lib/api";
 import TutorTimeSlot from "@/components/tutor/time-slot/tutor-time-slot";
 import TutorHeader from "@/components/navigation/tutor-header";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "@/components/ui/toast";
 import { ProposalSkeleton } from "@/components/loading/skeletons";
 
 export default function ProposalForm() {
@@ -34,7 +34,14 @@ function RequestForm({ id }: { id: string | null }) {
       })
       .catch((cause) => {
         if (active) {
-          setError(cause.message);
+          const message =
+            cause instanceof Error ? cause.message : "Unable to load request.";
+          setError(message);
+          toast.add({
+            title: "Unable to load request",
+            description: message,
+            type: "error",
+          });
           setLoading(false);
         }
       });
@@ -49,11 +56,6 @@ function RequestForm({ id }: { id: string | null }) {
   return (
     <main className="flex min-h-screen flex-col items-center gap-8 px-5 py-8">
       <TutorHeader />
-      {error && (
-        <Alert variant="destructive" className="max-w-md">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
       {loading ? (
         <ProposalSkeleton />
       ) : !error ? (

@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { api, type Interest } from "@/lib/api";
 import { useAuth } from "@/components/auth/auth-provider";
 import { studentOf } from "@/components/bookings/booking-list";
+import { toast } from "@/components/ui/toast";
 import {
   formatTime,
   isValidTimeRange,
@@ -42,49 +43,64 @@ export default function TutorTimeSlot({
     period: null,
   });
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
   const popupAnchor = useRef<HTMLDivElement>(null);
   const { session } = useAuth();
   const router = useRouter();
   const start = toMinutes(startSelection),
     end = toMinutes(endSelection);
   const validRange = isValidTimeRange(start, end);
-  const invalidRange = start !== null && end !== null && !validRange;
   const ready = date !== undefined && validRange;
   const dateLabel = date
     ? format(date, "EEEE, d MMM yyyy", { locale: enUS })
     : "";
-  const feedback =
-    error ||
-    (invalidRange
-      ? "Time End must be later than Time Start."
-      : !ready
-        ? "Please select a date and time."
-        : null);
+  const feedback = !ready ? "Please select a date and time." : null;
   async function submitRequest(action: "proposal" | "reject") {
     if (saving) return;
     let body: string | undefined;
     if (action === "proposal") {
-      if (!date || start === null || end === null || !validRange) return;
+      if (!date || start === null || end === null) {
+        toast.add({
+          title: "Incomplete selection",
+          description: "Please select a date and time.",
+          type: "warning",
+        });
+        return;
+      }
+      if (!validRange) {
+        toast.add({
+          title: "Invalid time range",
+          description: "Time End must be later than Time Start.",
+          type: "error",
+        });
+        return;
+      }
       body = JSON.stringify({ date: format(date, "yyyy-MM-dd"), start, end });
     }
     setSaving(true);
-    setError("");
     try {
       await api(
         `/interests/${interest.id}/${action}`,
         { method: "POST", body },
         session.csrfToken,
       );
+      toast.add({
+        title: action === "reject" ? "Request declined" : "Proposal sent",
+        description:
+          action === "reject"
+            ? "The lesson request has been declined."
+            : "Lesson time proposed to student.",
+        type: "success",
+      });
       router.push("/tutor/swiped");
     } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : action === "reject"
-            ? "Unable to decline request."
-            : "Unable to send time proposal.",
-      );
+      toast.add({
+        title:
+          action === "reject"
+            ? "Unable to decline request"
+            : "Unable to send time proposal",
+        description: cause instanceof Error ? cause.message : undefined,
+        type: "error",
+      });
     } finally {
       setSaving(false);
     }
@@ -123,7 +139,6 @@ export default function TutorTimeSlot({
                 selected={date}
                 onSelect={(next) => {
                   setDate(next);
-                  setError("");
                 }}
                 locale={enUS}
                 today={initialDate}
@@ -161,7 +176,6 @@ export default function TutorTimeSlot({
                   isUnavailable={() => false}
                   onChange={(value) => {
                     setStartSelection(value);
-                    setError("");
                   }}
                 />
                 <TimeSelect
@@ -173,14 +187,13 @@ export default function TutorTimeSlot({
                   isUnavailable={() => false}
                   onChange={(value) => {
                     setEndSelection(value);
-                    setError("");
                   }}
                 />
               </div>
               {feedback && (
                 <p
                   id="schedule-feedback"
-                  role={error || invalidRange ? "alert" : "status"}
+                  role="status"
                   className="text-center text-sm text-muted-foreground"
                 >
                   {feedback}

@@ -49,7 +49,6 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { toast } from "@/components/ui/toast";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ProfileSkeleton } from "@/components/loading/skeletons";
 
 export function Choice({
@@ -202,7 +201,6 @@ export default function ProfileForm({
         </Link>
         {!loaded ? loadError ? (
           <div className="flex flex-col items-start gap-4">
-            <Alert variant="destructive"><AlertDescription>{loadError}</AlertDescription></Alert>
             <Button variant="outline" onClick={() => window.location.reload()}>Try again</Button>
           </div>
         ) : <ProfileSkeleton tutor={role === "tutor"} /> : (
