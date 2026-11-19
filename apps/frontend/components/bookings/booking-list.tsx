@@ -1,6 +1,5 @@
 "use client";
 
-import { format, parseISO } from "date-fns";
 import {
   CalendarDays,
   Clock,
@@ -19,6 +18,8 @@ import {
   api,
   ApiError,
   formatMinutes,
+  formatSchedule,
+  formatScheduleDate,
   type Interest,
   type Match,
   type Proposal,
@@ -124,10 +125,7 @@ export function LessonBadges({
         className="h-auto gap-1 px-2 py-1 text-xs font-normal"
       >
         <Clock />
-        <span>
-          {proposal.date} · {formatMinutes(proposal.start)}–
-          {formatMinutes(proposal.end)}
-        </span>
+        <span>{formatSchedule(proposal)}</span>
       </Badge>
       <Badge
         variant="success"
@@ -404,6 +402,7 @@ function BookingListContent({
             appointment={proposalOf(selected)}
             contact={"contact" in selected ? selected.contact : null}
             statusLabel={status(selected)}
+            statusVariant={statusVariants[selected.status] ?? "secondary"}
             canResolve={
               selected.status === "proposed" && Boolean(future(selected))
             }
@@ -455,7 +454,7 @@ function BookingListContent({
               <li key={item.id}>
                 <button
                   type="button"
-                  aria-label={`${item.tutorName}, ${status(item)}${p ? `, ${p.date}, ${formatMinutes(p.start)}–${formatMinutes(p.end)}` : ", Schedule not set"}`}
+                  aria-label={`${item.tutorName}, ${status(item)}${p ? `, ${formatScheduleDate(p.date)}, ${formatMinutes(p.start)}–${formatMinutes(p.end)}` : ", Schedule not set"}`}
                   onClick={() => setSelectedId(item.id)}
                   className="group relative block h-[270px] w-[152px] overflow-hidden rounded-2xl bg-secondary text-left text-foreground ring-1 ring-border transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
@@ -467,7 +466,7 @@ function BookingListContent({
                     <div className="flex flex-col gap-1 text-xs leading-4 text-foreground/80 group-has-[img[data-loaded=true]]:text-white">
                       <p className="flex items-start gap-1.5">
                         <CalendarDays aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
-                        <span>{p ? format(parseISO(p.date), "d MMM yyyy") : "Schedule not set"}</span>
+                        <span>{p ? formatScheduleDate(p.date) : "Schedule not set"}</span>
                       </p>
                       {p && (
                         <p className="flex items-start gap-1.5">
@@ -479,8 +478,8 @@ function BookingListContent({
                       )}
                     </div>
                     <Badge
-                      variant={item.status === "cancelled" || item.status === "rejected" ? "destructive" : "default"}
-                      className={`h-auto max-w-full whitespace-normal py-1 text-[11px] leading-4 [text-shadow:none] ${item.status === "completed" ? "border-emerald-200 bg-emerald-100 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" : item.status === "cancelled" || item.status === "rejected" ? "bg-destructive text-white dark:text-black" : ""}`}
+                      variant={statusVariants[item.status] ?? "secondary"}
+                      className="h-auto max-w-full whitespace-normal py-1 text-[11px] leading-4 [text-shadow:none]"
                     >
                       {status(item)}
                     </Badge>
