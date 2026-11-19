@@ -42,17 +42,17 @@ export default function OfferConfirmationDialog({
                 {error}
               </p>
             )}
-            <div className="mt-10 flex justify-end gap-2">
+            <div className="mt-10 flex justify-end gap-3">
               <Dialog.Close
                 disabled={busy}
-                className="rounded-lg border border-border px-2 py-1 text-sm"
+                render={<Button variant="outline" />}
               >
                 Cancel
               </Dialog.Close>
               <Button
+                variant={confirmation === "reject" ? "destructive" : "default"}
                 onClick={onConfirm}
                 disabled={busy}
-                className="h-auto rounded-lg bg-primary px-2 py-1 text-sm text-primary-foreground hover:bg-primary/80"
               >
                 {confirmation === "reject" ? "Decline Match" : "Confirm Match"}
               </Button>

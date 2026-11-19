@@ -130,7 +130,7 @@ export function ProfilePageSkeleton() {
   return (
     <main className="min-h-screen bg-muted/30">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-5 py-8 sm:px-8 sm:py-12">
-        <Link href="/" className="self-start text-sm text-muted-foreground">Back to Tiwder</Link>
+        <Link href="/" className="self-start text-sm text-muted-foreground transition-colors hover:text-foreground">Back to Tiwder</Link>
         <ProfileSkeleton />
       </div>
     </main>

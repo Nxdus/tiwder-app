@@ -101,7 +101,7 @@ export default function TutorTimeSlot({
             href="/tutor/swiped"
             className={cn(
               buttonVariants({ variant: "ghost", size: "sm" }),
-              "self-start gap-2 px-0 text-sm font-normal hover:bg-transparent hover:underline",
+              "h-auto self-start gap-2 px-0 text-sm font-normal text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent",
             )}
           >
             <ArrowLeft aria-hidden="true" />
@@ -222,7 +222,6 @@ export default function TutorTimeSlot({
             </Badge>
             <Button
               size="lg"
-              className="rounded-lg"
               disabled={saving}
               onClick={() => void submitRequest("proposal")}
             >

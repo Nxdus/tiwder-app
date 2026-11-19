@@ -169,16 +169,19 @@ export default function TutorSwipeCard({
       aria-label="Discover tutors"
     >
       {details && showBack && (
-        <Button
-          variant="ghost"
-          onClick={() => {
-            onBack();
-          }}
-          className="mb-4 h-auto justify-start gap-2 p-0 text-sm font-normal"
-        >
-          <ArrowLeft className="size-4" />
-          Back to {tab === "Discover" ? "discover" : tab === "Matched" ? "matched" : "offered"}
-        </Button>
+        <div className={tab === "Discover" ? "mb-8 flex h-12 items-center" : "mb-4"}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              onBack();
+            }}
+            className="h-auto justify-start gap-2 px-0 text-sm font-normal text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
+          >
+            <ArrowLeft className="size-4" />
+            Back to {tab === "Discover" ? "discover" : tab === "Matched" ? "matched" : "offered"}
+          </Button>
+        </div>
       )}
       <div className="[perspective:1400px]">
         <div
@@ -355,7 +358,7 @@ export default function TutorSwipeCard({
                         expanded: !aboutExpanded,
                       })
                     }
-                    className="mt-1 h-auto gap-1 px-0 py-0.5 text-xs font-medium text-foreground hover:bg-transparent hover:underline"
+                    className="mt-1 h-auto gap-1 px-0 py-0.5 text-xs font-medium text-foreground hover:bg-transparent hover:underline dark:hover:bg-transparent"
                   >
                     {aboutExpanded ? "Show less" : "Show more"}
                     <ChevronDown
@@ -408,11 +411,11 @@ export default function TutorSwipeCard({
         canResolve && (
           <div className="mt-8 flex justify-between px-3">
             <Button
-              variant="default"
+              variant="destructive"
               aria-label="Reject offer"
               onClick={() => onReject()}
               disabled={busy}
-              className="h-16 w-[120px] rounded-full bg-primary text-primary-foreground hover:bg-primary/80"
+              className="h-16 w-[120px] rounded-full"
             >
               <X className="size-12" />
             </Button>
@@ -421,7 +424,7 @@ export default function TutorSwipeCard({
               aria-label="Accept offer"
               onClick={() => onAccept()}
               disabled={busy}
-              className="h-16 w-[120px] rounded-full bg-primary text-primary-foreground hover:bg-primary/80"
+              className="h-16 w-[120px] rounded-full"
             >
               <Check className="size-12" />
             </Button>
@@ -446,7 +449,7 @@ export default function TutorSwipeCard({
             onClick={() => onDetailsChange(!details)}
             variant="secondary"
             size="icon-lg"
-            className="size-16 rounded-full bg-secondary text-secondary-foreground"
+            className="size-16 rounded-full"
             aria-label={details ? "Show tutor photos" : "Show tutor details"}
             aria-pressed={details}
             aria-controls="tutor-card"

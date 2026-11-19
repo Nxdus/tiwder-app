@@ -375,8 +375,8 @@ function BookingListContent({
                 className={cn(
                   "h-9 rounded-full px-3.5 text-sm font-medium transition-colors sm:h-8",
                   active
-                    ? "bg-foreground text-background shadow-xs hover:bg-foreground/90 hover:text-background"
-                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80 sm:bg-transparent sm:text-muted-foreground sm:hover:bg-background/80 sm:hover:text-foreground",
+                    ? "bg-foreground text-background shadow-xs hover:bg-foreground/90 hover:text-background dark:hover:bg-foreground/90"
+                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80 dark:hover:bg-secondary/80 sm:bg-transparent sm:text-muted-foreground sm:hover:bg-background/80 sm:hover:text-foreground sm:dark:hover:bg-background/80",
                 )}
               >
                 <span>{label}</span>

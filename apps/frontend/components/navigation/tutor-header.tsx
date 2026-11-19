@@ -43,9 +43,10 @@ export default function TutorHeader({
           href="/tutor/swiped"
           aria-current={activePage === "swiped" ? "page" : undefined}
           className={cn(
-            buttonVariants({ variant: "secondary" }),
+            buttonVariants({
+              variant: activePage === "swiped" ? "default" : "secondary",
+            }),
             "h-8 rounded-full px-4 text-sm font-medium",
-            activePage === "swiped" && "bg-primary text-primary-foreground hover:bg-primary/80",
           )}
         >
           Swiped
@@ -54,9 +55,10 @@ export default function TutorHeader({
           href="/tutor/matched"
           aria-current={activePage === "matched" ? "page" : undefined}
           className={cn(
-            buttonVariants({ variant: "secondary" }),
+            buttonVariants({
+              variant: activePage === "matched" ? "default" : "secondary",
+            }),
             "h-8 rounded-full px-4 text-sm font-medium",
-            activePage === "matched" && "bg-primary text-primary-foreground hover:bg-primary/80",
           )}
         >
           Matched
