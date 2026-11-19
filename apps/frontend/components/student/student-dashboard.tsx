@@ -10,7 +10,6 @@ import {
   api,
   ApiError,
   type Interest,
-  type Match,
   type PublicTutor,
   type Subject,
 } from "@/lib/api";
@@ -51,26 +50,18 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
     try {
       const studentRequests =
         session.user?.role === "student"
-          ? [
-              api<Interest[]>("/interests").catch(() => []),
-              api<Match[]>("/matches").catch(() => []),
-            ]
-          : [Promise.resolve([]), Promise.resolve([])];
+          ? api<Interest[]>("/interests").catch(() => [])
+          : Promise.resolve([]);
 
-      const [people, catalog, interests, matches] = await Promise.all([
+      const [people, catalog, interests] = await Promise.all([
         api<PublicTutor[]>("/tutors"),
         api<Subject[]>("/subjects"),
-        ...studentRequests,
+        studentRequests,
       ]);
 
       const activeIds = new Set<string>();
-      for (const item of interests as Interest[]) {
+      for (const item of interests) {
         if (item.status === "pending" || item.status === "proposed") {
-          activeIds.add(item.tutorId);
-        }
-      }
-      for (const item of matches as Match[]) {
-        if (item.status === "confirmed" || item.status === "in-progress") {
           activeIds.add(item.tutorId);
         }
       }
