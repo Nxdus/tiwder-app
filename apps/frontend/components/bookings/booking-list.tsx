@@ -39,7 +39,7 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from "@/components/ui/empty";
-import { cn } from "@/lib/utils";
+import { cn, formatCompactName } from "@/lib/utils";
 
 type Lesson = Interest | Match;
 const labels: Record<string, string> = {
@@ -107,14 +107,6 @@ export function studentOf(item: Lesson): Student {
     subject: item.subjectName,
     level: item.skillLevel,
   };
-}
-function formatCompactName(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length < 2) return name.trim();
-  const last = parts[parts.length - 1];
-  const initial =
-    last.match(/^[เแโใไ]?(.)/u)?.[1] ?? Array.from(last)[0] ?? "";
-  return initial ? `${parts[0]} ${initial.toLocaleUpperCase()}.` : parts[0];
 }
 function tutorOf(item: Lesson): Tutor {
   return {
@@ -375,7 +367,7 @@ function BookingListContent({
                 className={cn(
                   "h-9 rounded-full px-3.5 text-sm font-medium transition-colors sm:h-8",
                   active
-                    ? "bg-foreground text-background shadow-xs hover:bg-foreground/90 hover:text-background dark:hover:bg-foreground/90"
+                    ? "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 hover:text-primary-foreground dark:hover:bg-primary/90"
                     : "bg-secondary text-secondary-foreground hover:bg-secondary/80 dark:hover:bg-secondary/80 sm:bg-transparent sm:text-muted-foreground sm:hover:bg-background/80 sm:hover:text-foreground sm:dark:hover:bg-background/80",
                 )}
               >
@@ -384,7 +376,7 @@ function BookingListContent({
                   <span
                     className={cn(
                       "text-xs tabular-nums",
-                      active ? "text-background/75" : "text-muted-foreground",
+                      active ? "text-primary-foreground/80" : "text-muted-foreground",
                     )}
                   >
                     {count}

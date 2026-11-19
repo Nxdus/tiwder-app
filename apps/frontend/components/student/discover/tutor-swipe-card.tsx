@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Tutor } from "@/lib/student/tutors";
 import { formatSchedule, type Proposal } from "@/lib/api";
+import { formatCompactName } from "@/lib/utils";
 import TutorPhoto from "./tutor-photo";
 import PhotoIndicators from "@/components/ui/photo-indicators";
 
@@ -311,9 +312,16 @@ export default function TutorSwipeCard({
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto p-4 text-sm leading-relaxed text-muted-foreground">
                 <div className="flex items-center justify-between gap-2">
-                  <h2 className="min-w-0 text-xl font-semibold text-foreground">
-                    {tutor.name}{" "}
-                    <span className="ml-2 font-normal">{tutor.age}</span>
+                  <h2
+                    title={tutor.name}
+                    className="flex min-w-0 items-baseline gap-2 text-xl font-semibold text-foreground"
+                  >
+                    <span className="truncate">
+                      {formatCompactName(tutor.name)}
+                    </span>
+                    {tutor.age != null && (
+                      <span className="shrink-0 font-normal">{tutor.age}</span>
+                    )}
                   </h2>
                   {openedTutor && (
                     <Badge variant={statusVariant} className="gap-1 text-xs">
