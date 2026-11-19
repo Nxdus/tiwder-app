@@ -403,6 +403,14 @@ describe('Tiwder API', () => {
           .post('/api/matches/' + match + '/cancel')
           .set(t.headers)
           .expect(201);
+        expect(
+          (
+            await testPool.query(
+              'select slot_status from time_slots where id=(select time_slot_id from matches where id=$1)',
+              [match],
+            )
+          ).rows[0].slot_status,
+        ).toBe('cancelled');
       } else {
         await testPool.query(
           "update time_slots set starts_at=now()-interval '2 hours', ends_at=now()-interval '1 hour' where id=(select time_slot_id from matches where id=$1)",

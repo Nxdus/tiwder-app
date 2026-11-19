@@ -415,9 +415,13 @@ export class BookingService {
             sql`clock_timestamp()<${row.startsAt.toISOString()}::timestamptz`,
           ),
         )
-        .returning({ id: matches.id });
+        .returning({ id: matches.id, timeSlotId: matches.timeSlotId });
       if (!updated[0]) throw new ConflictException('Match cannot be cancelled');
-      return updated[0];
+      await tx
+        .update(timeSlots)
+        .set({ status: 'cancelled' })
+        .where(eq(timeSlots.id, updated[0].timeSlotId));
+      return { id: updated[0].id };
     });
   }
 }

@@ -91,6 +91,14 @@ export function studentOf(item: Lesson): Student {
     level: item.skillLevel,
   };
 }
+function formatCompactName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length < 2) return name.trim();
+  const last = parts[parts.length - 1];
+  const initial =
+    last.match(/^[เแโใไ]?(.)/u)?.[1] ?? Array.from(last)[0] ?? "";
+  return initial ? `${parts[0]} ${initial.toLocaleUpperCase()}.` : parts[0];
+}
 function tutorOf(item: Lesson): Tutor {
   return {
     id: item.tutorId,
@@ -147,11 +155,13 @@ export default function BookingList(props: ComponentProps<typeof BookingListCont
 function BookingListContent({
   kind,
   onConfirmed,
+  onRequested,
   offeredSubjectChoices,
   loadingOfferedSubjects = false,
 }: {
   kind: "interests" | "matches";
   onConfirmed?: () => void;
+  onRequested?: () => void;
   offeredSubjectChoices?: Tutor["subjects"];
   loadingOfferedSubjects?: boolean;
 }) {
@@ -218,6 +228,36 @@ function BookingListContent({
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Unable to update lesson.",
+      );
+      if (cause instanceof ApiError && cause.status === 401)
+        void refreshSession().catch(() => {});
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function requestAgain(item: Lesson) {
+    setBusy(true);
+    setError("");
+    try {
+      await api(
+        "/interests",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            tutorId: item.tutorId,
+            subjectId: item.subjectId,
+          }),
+        },
+        session.csrfToken,
+      );
+      onRequested?.();
+    } catch (cause) {
+      setError(
+        cause instanceof ApiError && cause.status === 409
+          ? "You already have an open request for this tutor and subject."
+          : cause instanceof Error
+            ? cause.message
+            : "Unable to send request.",
       );
       if (cause instanceof ApiError && cause.status === 401)
         void refreshSession().catch(() => {});
@@ -430,6 +470,18 @@ function BookingListContent({
                   Cancel lesson
                 </Button>
               )}
+            {kind === "matches" &&
+              (selected.status === "cancelled" ||
+                selected.status === "completed") && (
+                <Button
+                  disabled={busy}
+                  onClick={() => void requestAgain(selected)}
+                >
+                  {selected.status === "completed"
+                    ? "Book again"
+                    : "Request new time"}
+                </Button>
+              )}
           </div>
           <OfferConfirmationDialog
             confirmation={confirmation}
@@ -460,8 +512,11 @@ function BookingListContent({
                 >
                   <TutorPhoto tutor={tutorOf(item)} />
                   <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3 group-has-[img[data-loaded=true]]:text-white group-has-[img[data-loaded=true]]:[text-shadow:0_1px_3px_rgb(0_0_0/0.85)]">
-                    <p className="break-words text-sm font-semibold leading-5">
-                      {item.tutorName}
+                    <p
+                      title={item.tutorName}
+                      className="truncate text-sm font-semibold leading-5"
+                    >
+                      {formatCompactName(item.tutorName)}
                     </p>
                     <div className="flex flex-col gap-1 text-xs leading-4 text-foreground/80 group-has-[img[data-loaded=true]]:text-white">
                       <p className="flex items-start gap-1.5">

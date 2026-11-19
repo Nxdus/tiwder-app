@@ -275,6 +275,7 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
             key={tab}
             kind={tab === "Matched" ? "matches" : "interests"}
             onConfirmed={() => router.push("/student/matched")}
+            onRequested={() => router.push("/student/offered")}
             offeredSubjectChoices={tab === "Offered" ? choices : undefined}
             loadingOfferedSubjects={loading}
           />
