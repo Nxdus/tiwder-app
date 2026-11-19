@@ -22,7 +22,7 @@ const timeFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit", hour12: true,
 });
 const compactDateFormatter = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Asia/Bangkok", day: "numeric", month: "short",
+  timeZone: "Asia/Bangkok", day: "numeric", month: "short", year: "numeric",
 });
 const compactTimeFormatter = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Asia/Bangkok", hour: "2-digit", minute: "2-digit", hour12: false,

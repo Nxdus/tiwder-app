@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   BadgeDollarSign,
+  BanknoteArrowUp,
   Check,
   CircleAlert,
   Clock,
@@ -15,10 +16,11 @@ import {
   Timer,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Tutor } from "@/lib/student/tutors";
-import { formatMinutes, type Proposal } from "@/lib/api";
+import { formatSchedule, type Proposal } from "@/lib/api";
 import TutorPhoto from "./tutor-photo";
 import PhotoIndicators from "@/components/ui/photo-indicators";
 
@@ -37,6 +39,7 @@ export default function TutorSwipeCard({
   appointment,
   contact,
   statusLabel,
+  statusVariant = "secondary",
   canResolve = true,
   busy = false,
   showBack = true,
@@ -55,6 +58,7 @@ export default function TutorSwipeCard({
   appointment?: Proposal | null;
   contact?: { email: string; phone: string } | null;
   statusLabel?: string;
+  statusVariant?: ComponentProps<typeof Badge>["variant"];
   canResolve?: boolean;
   busy?: boolean;
   showBack?: boolean;
@@ -242,37 +246,44 @@ export default function TutorSwipeCard({
                 <TutorPhoto tutor={tutor} photoIndex={photoIndex} />
                 <PhotoIndicators activeIndex={photoIndex} count={photoCount} />
                 {openedTutor && (
-                  <div className="absolute inset-x-2 bottom-2 flex justify-between gap-2 text-xs">
-                    <span className="flex items-center gap-1 rounded-full bg-secondary text-secondary-foreground px-2 py-1">
-                      <Clock className="size-4" />
-                      {appointment
-                        ? `${appointment.date} ${formatMinutes(appointment.start)}–${formatMinutes(appointment.end)}`
-                        : "Schedule not set"}
-                    </span>
-                    <span className="rounded-full bg-secondary text-secondary-foreground px-2 py-1">
-                      ฿{" "}
-                      {appointment
-                        ? (
-                            ((appointment.end - appointment.start) / 60) *
-                            tutor.rate
-                          ).toLocaleString("en-US")
-                        : tutor.rate}
-                    </span>
+                  <div className="pointer-events-none absolute inset-x-2 bottom-2 z-20 flex items-center justify-between gap-2">
+                    <Badge
+                      variant="secondary"
+                      className="h-auto gap-1 px-2 py-1 text-xs font-normal"
+                    >
+                      <Clock />
+                      <span>
+                        {appointment
+                          ? formatSchedule(appointment)
+                          : "Schedule not set"}
+                      </span>
+                    </Badge>
+                    <Badge
+                      variant="success"
+                      className="h-auto gap-1 px-2 py-1 text-xs font-normal"
+                    >
+                      <BanknoteArrowUp />฿{" "}
+                      {(appointment
+                        ? ((appointment.end - appointment.start) / 60) *
+                          tutor.rate
+                        : tutor.rate
+                      ).toLocaleString("en-US")}
+                    </Badge>
                   </div>
                 )}
               </div>
               <div className="shrink-0 p-4 text-sm leading-relaxed text-muted-foreground">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-foreground">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="min-w-0 text-xl font-semibold text-foreground">
                     {tutor.name}{" "}
                     <span className="ml-2 font-normal">{tutor.age}</span>
                   </h2>
                   {openedTutor && (
-                    <span className="flex items-center gap-1 rounded-full bg-secondary text-secondary-foreground px-1.5 text-xs font-semibold">
-                      <CircleAlert className="size-3" />
+                    <Badge variant={statusVariant} className="gap-1 text-xs">
+                      <CircleAlert />
                       {statusLabel ??
                         (tab === "Matched" ? "In Program" : "Pending")}
-                    </span>
+                    </Badge>
                   )}
                 </div>
                 <div className="mt-3 space-y-3">

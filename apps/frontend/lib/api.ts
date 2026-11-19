@@ -1,3 +1,5 @@
+import { format, parseISO } from "date-fns";
+
 export type Role = "student" | "tutor";
 export type SkillLevel = "Beginner" | "Intermediate" | "Advanced";
 export type User = {
@@ -132,6 +134,12 @@ export const formatMinutes = (minutes: number) =>
   minutes === 1440
     ? "24:00"
     : `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+export const formatScheduleDate = (date: string) =>
+  format(parseISO(date), "d MMM yyyy");
+export const formatSchedule = (
+  proposal: Pick<Proposal, "date" | "start" | "end">,
+) =>
+  `${formatScheduleDate(proposal.date)} · ${formatMinutes(proposal.start)}–${formatMinutes(proposal.end)}`;
 export const bangkokToday = () =>
   new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Bangkok",
