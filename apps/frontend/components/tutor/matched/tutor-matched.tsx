@@ -44,7 +44,7 @@ export default function TutorMatched({ matches }: { matches: TutorMatch[] }) {
               const timeLabel = `${dateFormatter.format(startsAt)} ${timeFormatter.format(startsAt)} - ${timeFormatter.format(endsAt)}`;
 
               return (
-                <li key={match.id}>
+                <li key={match.id} className="h-full">
                   <StudentCard
                     student={match.student}
                     status={

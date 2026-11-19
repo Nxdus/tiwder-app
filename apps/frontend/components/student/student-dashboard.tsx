@@ -6,7 +6,14 @@ import { useRouter } from "next/navigation";
 import DiscoverHeader from "@/components/student/discover-header";
 import { AuthGate, useAuth } from "@/components/auth/auth-provider";
 import BookingList from "@/components/bookings/booking-list";
-import { api, ApiError, type PublicTutor, type Subject } from "@/lib/api";
+import {
+  api,
+  ApiError,
+  type Interest,
+  type Match,
+  type PublicTutor,
+  type Subject,
+} from "@/lib/api";
 import type { SearchOption, Tutor } from "@/lib/student/tutors";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -26,6 +33,7 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
   const { session, refresh: refreshSession } = useAuth();
   const [tutors, setTutors] = useState<Tutor[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [excludedTutorIds, setExcludedTutorIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -41,10 +49,33 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
       setError("");
     }
     try {
-      const [people, catalog] = await Promise.all([
+      const studentRequests =
+        session.user?.role === "student"
+          ? [
+              api<Interest[]>("/interests").catch(() => []),
+              api<Match[]>("/matches").catch(() => []),
+            ]
+          : [Promise.resolve([]), Promise.resolve([])];
+
+      const [people, catalog, interests, matches] = await Promise.all([
         api<PublicTutor[]>("/tutors"),
         api<Subject[]>("/subjects"),
+        ...studentRequests,
       ]);
+
+      const activeIds = new Set<string>();
+      for (const item of interests as Interest[]) {
+        if (item.status === "pending" || item.status === "proposed") {
+          activeIds.add(item.tutorId);
+        }
+      }
+      for (const item of matches as Match[]) {
+        if (item.status === "confirmed" || item.status === "in-progress") {
+          activeIds.add(item.tutorId);
+        }
+      }
+      setExcludedTutorIds(Array.from(activeIds));
+
       setTutors(
         people.map((tutor) => ({
           id: tutor.id,
@@ -75,7 +106,7 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [session.user]);
   useEffect(() => {
     // Fetching the initial catalog synchronizes with the tutor API.
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -84,6 +115,10 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [load]);
+  const availableTutors = useMemo(() => {
+    const excluded = new Set(excludedTutorIds);
+    return tutors.filter((tutor) => !excluded.has(tutor.id));
+  }, [tutors, excludedTutorIds]);
   const choices = useMemo(
     () =>
       subjects.flatMap((subject) =>
@@ -98,13 +133,13 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
   );
   const discoverChoices = useMemo(() => {
     const taughtSubjectIds = new Set(
-      tutors.flatMap((tutor) => tutor.subjects.map((subject) => subject.id)),
+      availableTutors.flatMap((tutor) => tutor.subjects.map((subject) => subject.id)),
     );
     return choices.filter((subject) => taughtSubjectIds.has(subject.id));
-  }, [choices, tutors]);
+  }, [choices, availableTutors]);
   const deck = useMemo(
     () =>
-      tutors.filter((tutor) => {
+      availableTutors.filter((tutor) => {
         if (selectedSearch.length)
           return tutor.subjects.some((subject) =>
             selectedSearch.some((option) =>
@@ -125,7 +160,7 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
           ].some((value) => value.toLowerCase().includes(term))
         );
       }),
-    [tutors, selectedSearch, query],
+    [availableTutors, selectedSearch, query],
   );
   const tutor = deck.length ? deck[index % deck.length] : null;
   function requireStudent() {
@@ -159,6 +194,8 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
         },
         session.csrfToken,
       );
+      const sentTutorId = pendingTutor.id;
+      setExcludedTutorIds((previous) => [...previous, sentTutorId]);
       setPendingTutor(null);
       router.push("/student/offered");
       setDetails(false);
@@ -238,16 +275,20 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
                 <EmptyTitle>
                   {error
                     ? "Tutors could not be loaded"
-                    : tutors.length
+                    : availableTutors.length
                       ? "No tutors match your search"
-                      : "No tutors yet"}
+                      : tutors.length
+                        ? "No more tutors to discover"
+                        : "No tutors yet"}
                 </EmptyTitle>
                 <EmptyDescription>
                   {error
                     ? "Please try again in a moment."
-                    : tutors.length
+                    : availableTutors.length
                       ? "Try another subject or clear your filters."
-                      : "Tutors will appear here once they complete their profiles."}
+                      : tutors.length
+                        ? "You've sent requests to all available tutors. Check your Offered or Matched tabs!"
+                        : "Tutors will appear here once they complete their profiles."}
                 </EmptyDescription>
               </EmptyHeader>
               <Button variant="outline" onClick={() => void load()}>
