@@ -1,10 +1,11 @@
 "use client";
 
 import { LoadingImage } from "@/components/ui/loading-image";
-import { Gauge, ImageIcon, Mail, Phone } from "lucide-react";
+import { ChevronDown, Gauge, ImageIcon, Mail, Phone } from "lucide-react";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import PhotoIndicators from "@/components/ui/photo-indicators";
@@ -19,6 +20,7 @@ export default function StudentCard({
   photoDetails,
   href,
   actions,
+  className,
 }: {
   student: Student;
   selectable?: boolean;
@@ -26,6 +28,7 @@ export default function StudentCard({
   photoDetails?: ReactNode;
   href?: string;
   actions?: ReactNode;
+  className?: string;
 }) {
   const photos = student.photos?.length
     ? student.photos
@@ -33,10 +36,44 @@ export default function StudentCard({
       ? [student.photoUrl]
       : [];
   const [photoSelection, setPhotoSelection] = useState({ student: "", index: 0 });
+  const [aboutToggle, setAboutToggle] = useState({ student: "", expanded: false });
+  const [truncatedStudent, setTruncatedStudent] = useState({
+    student: "",
+    truncated: false,
+  });
+  const aboutRef = useRef<HTMLParagraphElement | null>(null);
+
   const photoCount = photos.length || 1;
   const photoIndex =
     photoSelection.student === student.id ? photoSelection.index % photoCount : 0;
   const photo = photos[photoIndex];
+
+  const aboutExpanded =
+    aboutToggle.student === student.id && aboutToggle.expanded;
+  const isAboutTruncated =
+    truncatedStudent.student === student.id && truncatedStudent.truncated;
+
+  useEffect(() => {
+    const element = aboutRef.current;
+    if (!element || aboutExpanded) return;
+
+    const measure = () => {
+      const next = element.scrollHeight > element.clientHeight + 1;
+      setTruncatedStudent((previous) =>
+        previous.student === student.id && previous.truncated === next
+          ? previous
+          : { student: student.id, truncated: next },
+      );
+    };
+
+    const frame = requestAnimationFrame(measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [student.id, student.about, aboutExpanded]);
 
   function changePhoto(direction: number) {
     setPhotoSelection({
@@ -47,9 +84,10 @@ export default function StudentCard({
   return (
     <Card
       className={cn(
-        "relative isolate w-full gap-0 border-0 bg-card py-0 shadow-lg ring-0",
+        "relative isolate flex h-full flex-col w-full gap-0 border-0 bg-card py-0 shadow-lg ring-0",
         selectable &&
           "transition-[translate,box-shadow] duration-200 ease-out hover:shadow-xl focus-within:shadow-xl active:shadow-md motion-safe:hover:-translate-y-2 motion-safe:focus-within:-translate-y-2 motion-reduce:transition-none",
+        className,
       )}
     >
       {selectable && (
@@ -59,7 +97,7 @@ export default function StudentCard({
           className="absolute inset-0 z-10 rounded-[inherit] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
         />
       )}
-      <div className="relative flex h-[230px] items-center justify-center overflow-hidden border-b border-primary/20 bg-linear-to-br from-primary/30 via-primary/15 to-primary/5 p-4">
+      <div className="relative flex h-[230px] shrink-0 items-center justify-center overflow-hidden border-b border-primary/20 bg-linear-to-br from-primary/30 via-primary/15 to-primary/5 p-4">
         {photos.length > 0 ? (
           <div
             role="group"
@@ -127,7 +165,7 @@ export default function StudentCard({
           </span>
         )}
       </div>
-      <CardContent className="flex flex-col gap-4 p-4">
+      <CardContent className="flex flex-1 flex-col gap-4 p-4">
         <div className="flex flex-col items-start gap-3">
           {status && <div>{status}</div>}
           <div className="flex w-full items-start justify-between gap-2">
@@ -168,30 +206,63 @@ export default function StudentCard({
         <Separator />
         <section
           aria-label={`About ${student.name}`}
-          className="flex flex-col gap-2"
+          className="flex flex-col gap-1"
         >
           <h3 className="text-base font-semibold">About</h3>
-          <p className="text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
+          <p
+            ref={aboutRef}
+            className={cn(
+              "text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground",
+              !aboutExpanded && "line-clamp-2",
+            )}
+          >
             {student.about}
           </p>
+          {(isAboutTruncated || aboutExpanded) && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              aria-expanded={aboutExpanded}
+              onClick={(event) => {
+                event.preventDefault();
+                setAboutToggle({
+                  student: student.id,
+                  expanded: !aboutExpanded,
+                });
+              }}
+              className="relative z-20 mt-1 h-auto w-fit gap-1 px-0 py-0.5 text-xs font-medium text-foreground hover:bg-transparent hover:underline dark:hover:bg-transparent"
+            >
+              {aboutExpanded ? "Show less" : "Show more"}
+              <ChevronDown
+                aria-hidden="true"
+                className={cn(
+                  "size-3.5 transition-transform duration-200",
+                  aboutExpanded && "rotate-180",
+                )}
+              />
+            </Button>
+          )}
         </section>
-        <Separator />
-        <section
-          aria-label={`Subject chosen by ${student.name}`}
-          className="flex flex-col gap-2"
-        >
-          <h3 className="text-base font-semibold">Subject chose</h3>
-          <div className="flex flex-col items-start gap-2">
-            <Badge className="border-primary/20 bg-primary/20 px-2.5 py-1 text-xs text-primary-foreground">{student.subject}</Badge>
-            <p className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Gauge aria-hidden="true" className="size-4 shrink-0" />
-              {student.level}
-            </p>
-          </div>
-        </section>
-        {actions && (
-          <div className="relative z-20 flex flex-wrap gap-2">{actions}</div>
-        )}
+        <div className="mt-auto flex flex-col gap-4">
+          <Separator />
+          <section
+            aria-label={`Subject chosen by ${student.name}`}
+            className="flex flex-col gap-2"
+          >
+            <h3 className="text-base font-semibold">Subject chose</h3>
+            <div className="flex flex-col items-start gap-2">
+              <Badge className="border-primary/20 bg-primary/20 px-2.5 py-1 text-xs text-primary-foreground">{student.subject}</Badge>
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Gauge aria-hidden="true" className="size-4 shrink-0" />
+                {student.level}
+              </p>
+            </div>
+          </section>
+          {actions && (
+            <div className="relative z-20 flex flex-wrap gap-2">{actions}</div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

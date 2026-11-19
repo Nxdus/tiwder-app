@@ -9,7 +9,7 @@ export default function TutorSwiped() {
       <main aria-label="Swiped students" className="w-full max-w-[1070px]">
         <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,330px),330px))] justify-center gap-x-10 gap-y-[50px]">
           {students.map((student) => (
-            <li key={student.id}>
+            <li key={student.id} className="h-full">
               <StudentCard student={student} selectable />
             </li>
           ))}

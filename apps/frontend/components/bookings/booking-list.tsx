@@ -420,7 +420,7 @@ function BookingListContent({
           {visible.map((item) => {
             const p = proposalOf(item);
             return (
-              <li key={item.id}>
+              <li key={item.id} className="h-full">
                 <StudentCard
                   student={studentOf(item)}
                   selectable={kind === "interests" && item.status === "pending"}
