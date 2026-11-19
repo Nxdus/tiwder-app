@@ -9,7 +9,13 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { OAuth2Client, LoginTicket } from 'google-auth-library';
 import { AppModule } from '../src/app.module.js';
 import { DatabaseService } from '../src/database/database.service.js';
-import { sessions, users } from '../src/database/schema.js';
+import {
+  matches,
+  sessions,
+  swipes,
+  timeSlots,
+  users,
+} from '../src/database/schema.js';
 import { digest } from '../src/auth.js';
 
 describe('Tiwder API', () => {
@@ -50,6 +56,100 @@ describe('Tiwder API', () => {
   });
   afterEach(() => vi.restoreAllMocks());
   const api = () => request(app.getHttpServer());
+  it('orders matches by ongoing, upcoming, and latest history for both roles with stable ties', async () => {
+    const student = await account(randomUUID());
+    const tutor = await account(randomUUID());
+    const subjectId = (await api().get('/api/subjects')).body[0].id;
+    for (const person of [student, tutor]) {
+      await api()
+        .post('/api/onboarding')
+        .set(person.headers)
+        .send({
+          role: person === student ? 'student' : 'tutor',
+          name: person.name,
+          phone: '0812345678',
+          bio: 'My bio',
+          ...(person === student
+            ? { gradeLevel: 'Grade 8' }
+            : {
+                education: 'Degree',
+                experienceYears: 3,
+                hourlyRate: 400,
+                teachings: [{ subjectId, skillLevel: 'Advanced' }],
+              }),
+        })
+        .expect(201);
+    }
+    const now = Date.now();
+    const at = (minutes: number) => new Date(now + minutes * 60000);
+    const ids: string[] = [];
+    const lessons = [
+      ['confirmed', 4320, 4380, 0],
+      ['completed', -4380, -4320, 0],
+      ['cancelled', 5760, 5820, -30],
+      ['confirmed', -30, 30, 0],
+      ['confirmed', 1440, 1500, 0],
+      ['confirmed', -120, -60, 0],
+      ['cancelled', 7200, 7260, -5760],
+      ['confirmed', 1440, 1500, 0],
+    ] as const;
+    for (const [status, start, end, updated] of lessons) {
+      const [interest] = await db.db
+        .insert(swipes)
+        .values({
+          studentId: student.id,
+          tutorId: tutor.id,
+          subjectId,
+          studentName: student.name,
+          tutorName: tutor.name,
+          subjectName: 'Sorting test',
+          skillLevel: 'Advanced',
+          hourlyRate: 400,
+          status: 'confirmed',
+        })
+        .returning();
+      const [slot] = await db.db
+        .insert(timeSlots)
+        .values({
+          tutorId: tutor.id,
+          date: '2099-01-01',
+          start: 60,
+          end: 120,
+          startsAt: at(start),
+          endsAt: at(end),
+          status: status === 'cancelled' ? 'cancelled' : 'booked',
+        })
+        .returning();
+      const [match] = await db.db
+        .insert(matches)
+        .values({
+          interestId: interest.id,
+          studentId: student.id,
+          tutorId: tutor.id,
+          timeSlotId: slot.id,
+          status,
+          updatedAt: at(updated),
+        })
+        .returning();
+      ids.push(match.id);
+    }
+    const expected = [
+      ids[3],
+      ...[ids[4], ids[7]].sort(),
+      ids[0],
+      ids[2],
+      ids[5],
+      ids[1],
+      ids[6],
+    ];
+    for (const person of [student, tutor, student]) {
+      const { body } = await api()
+        .get('/api/matches')
+        .set(person.headers)
+        .expect(200);
+      expect(body.map((match: { id: string }) => match.id)).toEqual(expected);
+    }
+  });
   it('persists profile photos, preserves them on other edits, and supports removal', async () => {
     const gmailAvatar = 'https://example.test/gmail-avatar.png';
     const person = await account('photo-test', gmailAvatar);

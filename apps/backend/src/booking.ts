@@ -364,6 +364,19 @@ export class BookingService {
             user.role === 'student' ? matches.studentId : matches.tutorId,
             user.id,
           ),
+        )
+        .orderBy(
+          sql`case
+            when ${matches.status} = 'confirmed' and ${timeSlots.startsAt} <= current_timestamp then 0
+            when ${matches.status} = 'confirmed' then 1
+            else 2
+          end`,
+          sql`case when ${matches.status} = 'confirmed' then ${timeSlots.startsAt} end asc`,
+          sql`case
+            when ${matches.status} = 'cancelled' then ${matches.updatedAt}
+            when ${matches.status} = 'completed' then ${timeSlots.endsAt}
+          end desc`,
+          asc(matches.id),
         );
       return withProfiles(
         tx,
