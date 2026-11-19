@@ -14,7 +14,7 @@ import {
   Header,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { and, eq, inArray, or, sql, asc } from 'drizzle-orm';
+import { and, eq, inArray, or, sql, asc, lt, gt } from 'drizzle-orm';
 import { z } from 'zod';
 import { AuthService, type Identity } from './auth.js';
 import { parse } from './profile.js';
@@ -31,7 +31,6 @@ import {
 } from './database/schema.js';
 
 type Tx = Parameters<Parameters<DatabaseService['db']['transaction']>[0]>[0];
-const live = ['pending', 'proposed'] as const;
 async function withProfiles<T extends { studentId: string; tutorId: string }>(
   tx: Tx,
   rows: T[],
@@ -241,9 +240,12 @@ export class BookingService {
           throw new ConflictException('No proposal to confirm');
         const participants = [row.studentId, row.tutorId];
         await settleMatches(tx, participants);
+        const startsAt = slotTime(row.date, row.start);
+        const endsAt = slotTime(row.date, row.end);
         const [active] = await tx
           .select({ id: matches.id })
           .from(matches)
+          .innerJoin(timeSlots, eq(timeSlots.id, matches.timeSlotId))
           .where(
             and(
               eq(matches.status, 'confirmed'),
@@ -251,11 +253,13 @@ export class BookingService {
                 eq(matches.studentId, row.studentId),
                 eq(matches.tutorId, row.tutorId),
               ),
+              lt(timeSlots.startsAt, endsAt),
+              gt(timeSlots.endsAt, startsAt),
             ),
           );
         if (active)
           throw new ConflictException(
-            'Participant already has an active match',
+            'This lesson overlaps another confirmed lesson for the student or tutor',
           );
         const [slot] = await tx
           .insert(timeSlots)
@@ -264,8 +268,8 @@ export class BookingService {
             date: row.date,
             start: row.start,
             end: row.end,
-            startsAt: slotTime(row.date, row.start),
-            endsAt: slotTime(row.date, row.end),
+            startsAt,
+            endsAt,
             status: 'booked',
           })
           .returning({ id: timeSlots.id });
@@ -282,18 +286,6 @@ export class BookingService {
           .update(swipes)
           .set({ status: 'confirmed', updatedAt: new Date() })
           .where(where);
-        await tx
-          .update(swipes)
-          .set({ status: 'closed', updatedAt: new Date() })
-          .where(
-            and(
-              inArray(swipes.status, [...live]),
-              or(
-                eq(swipes.studentId, row.studentId),
-                eq(swipes.tutorId, row.tutorId),
-              ),
-            ),
-          );
         return match;
       }
       if (action === 'proposal') {
@@ -372,6 +364,19 @@ export class BookingService {
             user.role === 'student' ? matches.studentId : matches.tutorId,
             user.id,
           ),
+        )
+        .orderBy(
+          sql`case
+            when ${matches.status} = 'confirmed' and ${timeSlots.startsAt} <= current_timestamp then 0
+            when ${matches.status} = 'confirmed' then 1
+            else 2
+          end`,
+          sql`case when ${matches.status} = 'confirmed' then ${timeSlots.startsAt} end asc`,
+          sql`case
+            when ${matches.status} = 'cancelled' then ${matches.updatedAt}
+            when ${matches.status} = 'completed' then ${timeSlots.endsAt}
+          end desc`,
+          asc(matches.id),
         );
       return withProfiles(
         tx,

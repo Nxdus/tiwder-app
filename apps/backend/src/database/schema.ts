@@ -3,6 +3,7 @@ import {
   boolean,
   date,
   integer,
+  index,
   numeric,
   pgEnum,
   pgTable,
@@ -186,10 +187,10 @@ export const matches = pgTable(
       .defaultNow(),
   },
   (t) => [
-    uniqueIndex('active_student')
+    index('active_student')
       .on(t.studentId)
       .where(sql`status='confirmed'`),
-    uniqueIndex('active_tutor')
+    index('active_tutor')
       .on(t.tutorId)
       .where(sql`status='confirmed'`),
   ],

@@ -9,7 +9,13 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { OAuth2Client, LoginTicket } from 'google-auth-library';
 import { AppModule } from '../src/app.module.js';
 import { DatabaseService } from '../src/database/database.service.js';
-import { sessions, users } from '../src/database/schema.js';
+import {
+  matches,
+  sessions,
+  swipes,
+  timeSlots,
+  users,
+} from '../src/database/schema.js';
 import { digest } from '../src/auth.js';
 
 describe('Tiwder API', () => {
@@ -50,6 +56,100 @@ describe('Tiwder API', () => {
   });
   afterEach(() => vi.restoreAllMocks());
   const api = () => request(app.getHttpServer());
+  it('orders matches by ongoing, upcoming, and latest history for both roles with stable ties', async () => {
+    const student = await account(randomUUID());
+    const tutor = await account(randomUUID());
+    const subjectId = (await api().get('/api/subjects')).body[0].id;
+    for (const person of [student, tutor]) {
+      await api()
+        .post('/api/onboarding')
+        .set(person.headers)
+        .send({
+          role: person === student ? 'student' : 'tutor',
+          name: person.name,
+          phone: '0812345678',
+          bio: 'My bio',
+          ...(person === student
+            ? { gradeLevel: 'Grade 8' }
+            : {
+                education: 'Degree',
+                experienceYears: 3,
+                hourlyRate: 400,
+                teachings: [{ subjectId, skillLevel: 'Advanced' }],
+              }),
+        })
+        .expect(201);
+    }
+    const now = Date.now();
+    const at = (minutes: number) => new Date(now + minutes * 60000);
+    const ids: string[] = [];
+    const lessons = [
+      ['confirmed', 4320, 4380, 0],
+      ['completed', -4380, -4320, 0],
+      ['cancelled', 5760, 5820, -30],
+      ['confirmed', -30, 30, 0],
+      ['confirmed', 1440, 1500, 0],
+      ['confirmed', -120, -60, 0],
+      ['cancelled', 7200, 7260, -5760],
+      ['confirmed', 1440, 1500, 0],
+    ] as const;
+    for (const [status, start, end, updated] of lessons) {
+      const [interest] = await db.db
+        .insert(swipes)
+        .values({
+          studentId: student.id,
+          tutorId: tutor.id,
+          subjectId,
+          studentName: student.name,
+          tutorName: tutor.name,
+          subjectName: 'Sorting test',
+          skillLevel: 'Advanced',
+          hourlyRate: 400,
+          status: 'confirmed',
+        })
+        .returning();
+      const [slot] = await db.db
+        .insert(timeSlots)
+        .values({
+          tutorId: tutor.id,
+          date: '2099-01-01',
+          start: 60,
+          end: 120,
+          startsAt: at(start),
+          endsAt: at(end),
+          status: status === 'cancelled' ? 'cancelled' : 'booked',
+        })
+        .returning();
+      const [match] = await db.db
+        .insert(matches)
+        .values({
+          interestId: interest.id,
+          studentId: student.id,
+          tutorId: tutor.id,
+          timeSlotId: slot.id,
+          status,
+          updatedAt: at(updated),
+        })
+        .returning();
+      ids.push(match.id);
+    }
+    const expected = [
+      ids[3],
+      ...[ids[4], ids[7]].sort(),
+      ids[0],
+      ids[2],
+      ids[5],
+      ids[1],
+      ids[6],
+    ];
+    for (const person of [student, tutor, student]) {
+      const { body } = await api()
+        .get('/api/matches')
+        .set(person.headers)
+        .expect(200);
+      expect(body.map((match: { id: string }) => match.id)).toEqual(expected);
+    }
+  });
   it('persists profile photos, preserves them on other edits, and supports removal', async () => {
     const gmailAvatar = 'https://example.test/gmail-avatar.png';
     const person = await account('photo-test', gmailAvatar);
@@ -234,9 +334,18 @@ describe('Tiwder API', () => {
       (await callback(missing.state, missing.cookie)).headers.location,
     ).toBe(failed);
   });
-  it.each(['student', 'tutor'])(
-    'serializes simultaneous confirmations sharing a %s across different dates',
-    async (overlap) => {
+  it.each(
+    ['student', 'tutor'].flatMap((shared) =>
+      [
+        { range: 'identical', start: 60, end: 120 },
+        { range: 'partial', start: 90, end: 150 },
+        { range: 'contained', start: 90, end: 120 },
+        { range: 'surrounding', start: 30, end: 150 },
+      ].map((proposal) => ({ shared, ...proposal })),
+    ),
+  )(
+    'rejects simultaneous $range overlaps sharing a $shared and preserves other offers',
+    async ({ shared: overlap, start, end }) => {
       const people = await Promise.all(
         Array.from({ length: 4 }, () => account(randomUUID())),
       );
@@ -245,7 +354,8 @@ describe('Tiwder API', () => {
         tutors = [t1, t2];
       const subjectId = (await api().get('/api/subjects')).body[0].id;
       const photos = [0, 1].map(
-        (value) => 'data:image/jpeg;base64,' +
+        (value) =>
+          'data:image/jpeg;base64,' +
           Buffer.from([255, 216, 255, value, 255, 217]).toString('base64'),
       );
       await api().get('/api/matches').set(s1.headers).expect(403);
@@ -342,7 +452,11 @@ describe('Tiwder API', () => {
         await api()
           .post(path)
           .set(t.headers)
-          .send({ date: '2099-01-0' + (index + 1), start: 60, end: 90 })
+          .send({
+            date: '2099-01-01',
+            start: index === 0 ? 60 : start,
+            end: index === 0 ? 120 : end,
+          })
           .expect(201);
       }
       const results = await Promise.all(
@@ -361,7 +475,7 @@ describe('Tiwder API', () => {
       const own = await api().get('/api/matches').set(s.headers).expect(200);
       expect(own.body[0].contact.email).toBe(t.email);
       expect(own.body[0].student.id).toBe(s.id);
-        expect(own.body[0].student.photos).toEqual(photos);
+      expect(own.body[0].student.photos).toEqual(photos);
       expect(own.body[0].tutor.id).toBe(t.id);
       expect(own.body[0].student).not.toHaveProperty('email');
       expect(own.body[0].tutor).not.toHaveProperty('phone');
@@ -395,7 +509,7 @@ describe('Tiwder API', () => {
         api()
           .post('/api/interests/' + id + '/proposal')
           .set(t.headers)
-          .send({ date: '2099-02-01', start: 120, end: 150 })
+          .send({ date: '2099-01-01', start: 90, end: 120 })
           .expect(201);
       const rejected = await fresh();
       await propose(rejected);
@@ -455,7 +569,117 @@ describe('Tiwder API', () => {
             .get('/api/interests')
             .set(pairs[1 - winner][0].headers)
         ).body.find((x: { id: string }) => x.id === ids[1 - winner]).status,
-      ).toBe('closed');
+      ).toBe('proposed');
+    },
+  );
+  it.each([
+    ['student', 'adjacent'],
+    ['tutor', 'adjacent'],
+    ['student', 'different dates'],
+    ['tutor', 'different dates'],
+    ['student', 'midnight'],
+    ['tutor', 'midnight'],
+  ])(
+    'allows simultaneous non-overlapping confirmations sharing a %s (%s)',
+    async (shared, schedule) => {
+      const people = await Promise.all(
+        Array.from({ length: 4 }, () => account(randomUUID())),
+      );
+      const [s1, s2, t1, t2] = people;
+      const subjectId = (await api().get('/api/subjects')).body[0].id;
+      for (const person of people) {
+        const role = person === s1 || person === s2 ? 'student' : 'tutor';
+        await api()
+          .post('/api/onboarding')
+          .set(person.headers)
+          .send({
+            role,
+            name: person.name,
+            phone: '0812345678',
+            bio: 'My bio',
+            ...(role === 'student'
+              ? { gradeLevel: 'Grade 8' }
+              : {
+                  education: 'Degree',
+                  experienceYears: 3,
+                  hourlyRate: 400,
+                  teachings: [{ subjectId, skillLevel: 'Advanced' }],
+                }),
+          })
+          .expect(201);
+      }
+      const pairs = [
+        [s1, t1],
+        [shared === 'student' ? s1 : s2, shared === 'tutor' ? t1 : t2],
+      ];
+      const ids: string[] = [];
+      for (const [index, [student, tutor]] of pairs.entries()) {
+        const { body } = await api()
+          .post('/api/interests')
+          .set(student.headers)
+          .send({ tutorId: tutor.id, subjectId })
+          .expect(201);
+        ids.push(body.id);
+        const date =
+          index === 1 && schedule !== 'adjacent' ? '2099-01-02' : '2099-01-01';
+        const start =
+          schedule === 'midnight'
+            ? index === 0
+              ? 1410
+              : 0
+            : schedule === 'adjacent' && index === 1
+              ? 90
+              : 60;
+        await api()
+          .post('/api/interests/' + body.id + '/proposal')
+          .set(tutor.headers)
+          .send({ date, start, end: start + 30 })
+          .expect(201);
+      }
+      const results = await Promise.all(
+        pairs.map(([student], index) =>
+          api()
+            .post('/api/interests/' + ids[index] + '/confirm')
+            .set(student.headers),
+        ),
+      );
+      expect(results.map((result) => result.status)).toEqual([201, 201]);
+      const participant = shared === 'student' ? s1 : t1;
+      const { body: matches } = await api()
+        .get('/api/matches')
+        .set(participant.headers)
+        .expect(200);
+      expect(matches).toHaveLength(2);
+
+      // A later confirmation must also leave a pending request untouched.
+      const { body: pending } = await api()
+        .post('/api/interests')
+        .set(s1.headers)
+        .send({ tutorId: t1.id, subjectId })
+        .expect(201);
+      const nextStudent = shared === 'student' ? s1 : s2;
+      const nextTutor = shared === 'student' ? t2 : t1;
+      const { body: next } = await api()
+        .post('/api/interests')
+        .set(nextStudent.headers)
+        .send({ tutorId: nextTutor.id, subjectId })
+        .expect(201);
+      await api()
+        .post('/api/interests/' + next.id + '/proposal')
+        .set(nextTutor.headers)
+        .send({ date: '2099-02-01', start: 60, end: 90 })
+        .expect(201);
+      await api()
+        .post('/api/interests/' + next.id + '/confirm')
+        .set(nextStudent.headers)
+        .expect(201);
+      const { body: interests } = await api()
+        .get('/api/interests')
+        .set(s1.headers)
+        .expect(200);
+      expect(
+        interests.find((item: { id: string }) => item.id === pending.id).status,
+      ).toBe('pending');
     },
   );
 });
