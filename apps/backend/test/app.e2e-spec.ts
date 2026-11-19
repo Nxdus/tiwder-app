@@ -51,10 +51,18 @@ describe('Tiwder API', () => {
   afterEach(() => vi.restoreAllMocks());
   const api = () => request(app.getHttpServer());
   it('persists profile photos, preserves them on other edits, and supports removal', async () => {
-    const person = await account('photo-test');
+    const gmailAvatar = 'https://example.test/gmail-avatar.png';
+    const person = await account('photo-test', gmailAvatar);
     const photo =
       'data:image/jpeg;base64,' +
       Buffer.from([255, 216, 255, 0, 255, 217]).toString('base64');
+    await api()
+      .get('/api/auth/session')
+      .set(person.headers)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.user.avatarUrl).toBe(gmailAvatar);
+      });
     await api()
       .post('/api/onboarding')
       .set(person.headers)
@@ -67,6 +75,13 @@ describe('Tiwder API', () => {
         photos: [photo],
       })
       .expect(201);
+    await api()
+      .get('/api/auth/session')
+      .set(person.headers)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.user.avatarUrl).toBe(photo);
+      });
     await api()
       .patch('/api/profile')
       .set(person.headers)
@@ -92,14 +107,21 @@ describe('Tiwder API', () => {
       .expect(({ body }) => {
         expect(body.photos).toEqual([]);
       });
+    await api()
+      .get('/api/auth/session')
+      .set(person.headers)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.user.avatarUrl).toBe(gmailAvatar);
+      });
   });
-  async function account(name: string) {
+  async function account(name: string, avatarUrl: string | null = null) {
     const token = randomUUID(),
       csrf = randomUUID(),
       email = name + '@example.test';
     const [u] = await db.db
       .insert(users)
-      .values({ name, email, googleSub: randomUUID() })
+      .values({ name, email, googleSub: randomUUID(), avatarUrl })
       .returning({ id: users.id });
     await db.db.insert(sessions).values({
       tokenHash: digest(token),

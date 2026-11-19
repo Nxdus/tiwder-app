@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import { CodeChallengeMethod, OAuth2Client } from 'google-auth-library';
-import { and, eq, gt, lt } from 'drizzle-orm';
+import { and, eq, gt, lt, sql } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 import { DatabaseService } from './database/database.service.js';
 import { users, sessions, oauthTransactions } from './database/schema.js';
@@ -57,7 +57,9 @@ const publicUser = {
   role: users.role,
   email: users.email,
   name: users.name,
-  avatarUrl: users.avatarUrl,
+  avatarUrl: sql<
+    string | null
+  >`coalesce(nullif(${users.photos}[1], ''), ${users.avatarUrl})`,
   onboarded: users.onboarded,
 };
 export type Identity = Pick<
