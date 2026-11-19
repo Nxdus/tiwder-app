@@ -15,7 +15,7 @@ import {
   type Subject,
 } from "@/lib/api";
 import type { SearchOption, Tutor } from "@/lib/student/tutors";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "@/components/ui/toast";
 import {
   Empty,
   EmptyHeader,
@@ -100,9 +100,14 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
       hasData.current = true;
       setError("");
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Unable to load tutors.",
-      );
+      const message =
+        cause instanceof Error ? cause.message : "Unable to load tutors.";
+      setError(message);
+      toast.add({
+        title: "Unable to load tutors",
+        description: message,
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -173,7 +178,13 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
       return false;
     }
     if (session.user.role !== "student") {
-      setError("Only student accounts can send lesson requests.");
+      const message = "Only student accounts can send lesson requests.";
+      setError(message);
+      toast.add({
+        title: "Access restricted",
+        description: message,
+        type: "error",
+      });
       return false;
     }
     return true;
@@ -197,12 +208,22 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
       const sentTutorId = pendingTutor.id;
       setExcludedTutorIds((previous) => [...previous, sentTutorId]);
       setPendingTutor(null);
+      toast.add({
+        title: "Request sent",
+        description: "Your lesson request has been sent to the tutor.",
+        type: "success",
+      });
       router.push("/student/offered");
       setDetails(false);
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Unable to send request.",
-      );
+      const message =
+        cause instanceof Error ? cause.message : "Unable to send request.";
+      setError(message);
+      toast.add({
+        title: "Unable to send request",
+        description: message,
+        type: "error",
+      });
       if (cause instanceof ApiError && cause.status === 401)
         void refreshSession().catch(() => {});
     } finally {
@@ -226,11 +247,6 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
             Go to your tutor dashboard →
           </Link>
         </p>
-      )}
-      {error && (
-        <Alert variant="destructive" className="mx-auto mt-6 max-w-xl">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
       )}
       {tab === "Discover" ? (
         <>
@@ -306,7 +322,6 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
               }}
               onConfirm={(ids) => void sendInterest(ids)}
               busy={saving}
-              error={error}
             />
           )}
         </>

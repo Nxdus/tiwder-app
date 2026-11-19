@@ -22,6 +22,7 @@ import TutorPhoto from "@/components/student/discover/tutor-photo";
 import SubjectSearch from "@/components/student/discover/subject-search";
 import { BookingListSkeleton } from "@/components/loading/skeletons";
 import OfferConfirmationDialog from "@/components/student/discover/offer-confirmation-dialog";
+import CancelConfirmationDialog from "@/components/bookings/cancel-confirmation-dialog";
 import {
   api,
   ApiError,
@@ -36,7 +37,7 @@ import type { SearchOption, Tutor } from "@/lib/student/tutors";
 import type { Student } from "@/lib/tutor/students";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "@/components/ui/toast";
 import {
   Empty,
   EmptyHeader,
@@ -191,6 +192,7 @@ function BookingListContent({
   const [confirmation, setConfirmation] = useState<"accept" | "reject" | null>(
     null,
   );
+  const [lessonToCancel, setLessonToCancel] = useState<Lesson | null>(null);
   const role = session.user?.role;
   const hasData = useRef(false);
   const load = useCallback(async () => {
@@ -203,9 +205,14 @@ function BookingListContent({
       hasData.current = true;
       setError("");
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Unable to load lessons.",
-      );
+      const message =
+        cause instanceof Error ? cause.message : "Unable to load lessons.";
+      setError(message);
+      toast.add({
+        title: "Unable to load lessons",
+        description: message,
+        type: "error",
+      });
       if (cause instanceof ApiError && cause.status === 401)
         void refreshSession().catch(() => {});
     } finally {
@@ -237,11 +244,29 @@ function BookingListContent({
       );
       await load();
       setConfirmation(null);
+      setLessonToCancel(null);
       if (name === "confirm") onConfirmed?.();
+      toast.add({
+        title: "Success",
+        description:
+          name === "confirm"
+            ? "Lesson confirmed successfully."
+            : name === "cancel"
+              ? "Lesson cancelled successfully."
+              : name === "reject"
+                ? "Lesson declined successfully."
+                : "Lesson updated successfully.",
+        type: "success",
+      });
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Unable to update lesson.",
-      );
+      const message =
+        cause instanceof Error ? cause.message : "Unable to update lesson.";
+      setError(message);
+      toast.add({
+        title: "Unable to update lesson",
+        description: message,
+        type: "error",
+      });
       if (cause instanceof ApiError && cause.status === 401)
         void refreshSession().catch(() => {});
     } finally {
@@ -263,15 +288,25 @@ function BookingListContent({
         },
         session.csrfToken,
       );
+      toast.add({
+        title: "Request sent",
+        description: "Your lesson request has been sent.",
+        type: "success",
+      });
       onRequested?.();
     } catch (cause) {
-      setError(
+      const message =
         cause instanceof ApiError && cause.status === 409
           ? "You already have an open request for this tutor and subject."
           : cause instanceof Error
             ? cause.message
-            : "Unable to send request.",
-      );
+            : "Unable to send request.";
+      setError(message);
+      toast.add({
+        title: "Unable to send request",
+        description: message,
+        type: "error",
+      });
       if (cause instanceof ApiError && cause.status === 401)
         void refreshSession().catch(() => {});
     } finally {
@@ -344,11 +379,6 @@ function BookingListContent({
             setSelectedSearch(nextSelection);
           }}
         />
-      )}
-      {error && (
-        <Alert variant="destructive" className="mx-auto mb-5 max-w-xl">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
       )}
       {showStatusFilter && !loading && items.length > 0 && (
         <div
@@ -447,7 +477,7 @@ function BookingListContent({
                         size="sm"
                         variant="outline"
                         disabled={busy}
-                        onClick={() => void action(item.id, "cancel")}
+                        onClick={() => setLessonToCancel(item)}
                       >
                         Cancel lesson
                       </Button>
@@ -501,7 +531,7 @@ function BookingListContent({
                 <Button
                   variant="outline"
                   disabled={busy}
-                  onClick={() => void action(selected.id, "cancel")}
+                  onClick={() => setLessonToCancel(selected)}
                   className="h-11 w-full gap-2 rounded-2xl border-destructive/30 text-sm font-medium text-destructive transition-all hover:bg-destructive/10 hover:text-destructive"
                 >
                   <CalendarX2 className="size-4" />
@@ -542,7 +572,6 @@ function BookingListContent({
               )
             }
             busy={busy}
-            error={error}
           />
         </>
       ) : (
@@ -593,6 +622,26 @@ function BookingListContent({
           })}
         </ul>
       )}
+      <CancelConfirmationDialog
+        open={lessonToCancel !== null}
+        onClose={() => {
+          if (!busy) {
+            setLessonToCancel(null);
+            setError("");
+          }
+        }}
+        onConfirm={() => {
+          if (lessonToCancel) void action(lessonToCancel.id, "cancel");
+        }}
+        busy={busy}
+        targetName={
+          lessonToCancel
+            ? role === "tutor"
+              ? lessonToCancel.studentName
+              : lessonToCancel.tutorName
+            : undefined
+        }
+      />
     </section>
   );
 }

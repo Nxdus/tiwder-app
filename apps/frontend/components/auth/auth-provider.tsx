@@ -10,9 +10,9 @@ import {
 import { useRouter } from "next/navigation";
 import { api, type Role, type Session } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LoadingRegion } from "@/components/loading/skeletons";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/toast";
 
 const AuthContext = createContext<{
   session: Session;
@@ -34,10 +34,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError("");
       return next;
     } catch (cause) {
+      const message =
+        cause instanceof Error ? cause.message : "Unable to load your account.";
       setSession({ user: null });
-      setError(
-        cause instanceof Error ? cause.message : "Unable to load your account.",
-      );
+      setError(message);
+      toast.add({
+        title: "Account error",
+        description: message,
+        type: "error",
+      });
       throw cause;
     } finally {
       setLoading(false);
@@ -95,10 +100,7 @@ export function AuthGate({
   }, [loading, error, user, role, onboarding, router]);
   if (error)
     return (
-      <div className="mx-auto flex max-w-md flex-col gap-4 p-8">
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+      <div className="mx-auto flex max-w-md flex-col items-center justify-center gap-4 p-8">
         <Button onClick={() => void refresh().catch(() => {})}>
           Try again
         </Button>

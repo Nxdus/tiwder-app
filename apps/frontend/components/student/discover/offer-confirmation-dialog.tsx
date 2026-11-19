@@ -8,13 +8,11 @@ export default function OfferConfirmationDialog({
   onClose,
   onConfirm,
   busy = false,
-  error,
 }: {
   confirmation: "accept" | "reject" | null;
   onClose: () => void;
   onConfirm: () => void;
   busy?: boolean;
-  error?: string;
 }) {
   return (
     <Dialog.Root
@@ -37,11 +35,6 @@ export default function OfferConfirmationDialog({
                 ? "Are you sure you want to decline this offer from your tutor? This offer will be removed."
                 : "Are you sure you want to confirm this match with your tutor? Your tutoring session will be confirmed."}
             </Dialog.Description>
-            {error && (
-              <p role="alert" className="mt-3 text-sm text-destructive">
-                {error}
-              </p>
-            )}
             <div className="mt-10 flex justify-end gap-3">
               <Dialog.Close
                 disabled={busy}

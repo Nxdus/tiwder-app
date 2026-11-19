@@ -4,7 +4,6 @@ import { Dialog } from "@base-ui/react/dialog";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel } from "@/components/ui/field";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Choice } from "@/components/auth/profile-form";
 import type { Tutor } from "@/lib/student/tutors";
 
@@ -14,14 +13,12 @@ export default function ChooseSubjectDialog({
   onOpenChange,
   onConfirm,
   busy = false,
-  error = "",
 }: {
   tutor: Tutor;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: (subjects: string[]) => void;
   busy?: boolean;
-  error?: string;
 }) {
   const [subject, setSubject] = useState(tutor.subjects[0]?.id ?? "");
   return (
@@ -42,11 +39,6 @@ export default function ChooseSubjectDialog({
               Send a lesson request to {tutor.name}. The tutor will propose a
               time for you to confirm.
             </Dialog.Description>
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
             <Field>
               <FieldLabel htmlFor="request-subject">Subject</FieldLabel>
               <Choice
