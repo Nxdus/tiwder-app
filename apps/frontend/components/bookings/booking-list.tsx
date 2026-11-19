@@ -9,6 +9,10 @@ import {
   CircleX,
   Clock,
   BanknoteArrowUp,
+  CalendarPlus,
+  CalendarX2,
+  RotateCcw,
+  Undo2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -479,13 +483,15 @@ function BookingListContent({
             busy={busy}
             showBack={kind === "interests" || visible.length > 1}
           />
-          <div className="mx-auto mt-4 flex max-w-[330px] justify-center">
+          <div className="mx-auto mt-4 w-full max-w-[330px]">
             {kind === "interests" && selected.status === "pending" && (
               <Button
                 variant="outline"
                 disabled={busy}
                 onClick={() => void action(selected.id, "withdraw")}
+                className="h-11 w-full gap-2 rounded-2xl text-sm font-medium transition-all hover:bg-muted"
               >
+                <Undo2 className="size-4" />
                 Withdraw request
               </Button>
             )}
@@ -496,7 +502,9 @@ function BookingListContent({
                   variant="outline"
                   disabled={busy}
                   onClick={() => void action(selected.id, "cancel")}
+                  className="h-11 w-full gap-2 rounded-2xl border-destructive/30 text-sm font-medium text-destructive transition-all hover:bg-destructive/10 hover:text-destructive"
                 >
+                  <CalendarX2 className="size-4" />
                   Cancel lesson
                 </Button>
               )}
@@ -506,10 +514,19 @@ function BookingListContent({
                 <Button
                   disabled={busy}
                   onClick={() => void requestAgain(selected)}
+                  className="h-11 w-full gap-2 rounded-2xl text-sm font-semibold shadow-xs transition-transform active:scale-[0.99]"
                 >
-                  {selected.status === "completed"
-                    ? "Book again"
-                    : "Request new time"}
+                  {selected.status === "completed" ? (
+                    <>
+                      <CalendarPlus className="size-4" />
+                      Book again
+                    </>
+                  ) : (
+                    <>
+                      <RotateCcw className="size-4" />
+                      Request new time
+                    </>
+                  )}
                 </Button>
               )}
           </div>
