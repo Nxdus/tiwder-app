@@ -61,13 +61,13 @@ export default function Login() {
             )}
 
             {loading ? (
-              <LoadingRegion label="Loading account…"><Skeleton className="h-12 w-full rounded-xl" /></LoadingRegion>
+              <LoadingRegion label="Loading account…"><Skeleton className="h-12 w-full rounded-4xl" /></LoadingRegion>
             ) : <Button
               nativeButton={false}
               disabled={loading}
               variant="outline"
               size="lg"
-              className="h-12 w-full gap-3 rounded-xl"
+              className="h-12 w-full gap-3"
               render={<a href="/api/auth/google" />}
             >
               <svg aria-hidden="true" viewBox="0 0 48 48" className="size-5">
