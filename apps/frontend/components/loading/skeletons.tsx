@@ -63,7 +63,7 @@ export function BookingListSkeleton({ tutor = false }: { tutor?: boolean }) {
     <LoadingRegion label="Loading lessons…" className={cn("mx-auto w-full", tutor && "max-w-[1070px]")}>
       <div className={tutor
         ? "grid grid-cols-[repeat(auto-fit,minmax(min(100%,330px),330px))] justify-center gap-x-10 gap-y-[50px]"
-        : "mx-auto mt-8 grid max-w-[1070px] grid-cols-[repeat(auto-fit,152px)] justify-center gap-x-10 gap-y-[50px]"}>
+        : "mx-auto mt-8 grid max-w-[536px] grid-cols-[repeat(auto-fit,152px)] justify-center gap-x-6 gap-y-[50px] sm:gap-x-10"}>
         {Array.from({ length: 3 }, (_, index) => tutor
           ? <StudentCardPlaceholder key={index} />
           : <Skeleton key={index} className="h-[270px] w-[152px] rounded-2xl" />)}
