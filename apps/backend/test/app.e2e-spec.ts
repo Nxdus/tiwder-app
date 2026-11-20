@@ -334,6 +334,125 @@ describe('Tiwder API', () => {
       (await callback(missing.state, missing.cookie)).headers.location,
     ).toBe(failed);
   });
+  it('keeps tutors out of a student discovery deck while active or ever completed', async () => {
+    const [student, otherStudent, tutor] = await Promise.all(
+      Array.from({ length: 3 }, () => account(randomUUID())),
+    );
+    const catalog = (await api().get('/api/subjects').expect(200)).body;
+    const subjectIds = catalog.slice(0, 2).map((s: { id: string }) => s.id);
+    expect(subjectIds).toHaveLength(2);
+    for (const person of [student, otherStudent, tutor]) {
+      await api()
+        .post('/api/onboarding')
+        .set(person.headers)
+        .send({
+          name: person.name,
+          phone: '0812345678',
+          bio: 'Discovery test',
+          ...(person === tutor
+            ? {
+                role: 'tutor',
+                education: 'Degree',
+                experienceYears: 3,
+                hourlyRate: 400,
+                teachings: subjectIds.map((subjectId: string) => ({
+                  subjectId,
+                  skillLevel: 'Advanced',
+                })),
+              }
+            : { role: 'student', gradeLevel: 'Grade 8' }),
+        })
+        .expect(201);
+    }
+    const visible = async (person = student) => {
+      const response = await api()
+        .get('/api/tutors')
+        .set(person.headers)
+        .expect(200);
+      expect(response.headers['cache-control']).toBe('no-store');
+      return response.body.some((row: { id: string }) => row.id === tutor.id);
+    };
+    const interest = async (subjectId = subjectIds[0]) =>
+      (
+        await api()
+          .post('/api/interests')
+          .set(student.headers)
+          .send({ tutorId: tutor.id, subjectId })
+          .expect(201)
+      ).body.id as string;
+    const change = (id: string, action: string) =>
+      api().post(`/api/interests/${id}/${action}`).set(student.headers);
+    const propose = (id: string) =>
+      api()
+        .post(`/api/interests/${id}/proposal`)
+        .set(tutor.headers)
+        .send({ date: '2099-02-01', start: 120, end: 150 })
+        .expect(201);
+    const confirm = async () => {
+      const id = await interest();
+      await propose(id);
+      return (await change(id, 'confirm').expect(201)).body.id as string;
+    };
+    const cancel = (id: string) =>
+      api().post(`/api/matches/${id}/cancel`).set(student.headers);
+
+    expect(await visible()).toBe(true);
+    const pending = await interest();
+    expect(await visible()).toBe(false);
+    expect(await visible(otherStudent)).toBe(true);
+    expect(await visible(tutor)).toBe(true);
+    expect(
+      (await api().get('/api/tutors').expect(200)).body.some(
+        (row: { id: string }) => row.id === tutor.id,
+      ),
+    ).toBe(true);
+
+    const secondSubject = await interest(subjectIds[1]);
+    await change(pending, 'withdraw').expect(201);
+    expect(await visible()).toBe(false);
+    await change(secondSubject, 'withdraw').expect(201);
+    expect(await visible()).toBe(true);
+
+    const offered = await interest();
+    await propose(offered);
+    expect(await visible()).toBe(false);
+    await change(offered, 'reject').expect(201);
+    expect(await visible()).toBe(true);
+
+    const cancelled = await confirm();
+    expect(await visible()).toBe(false);
+    await cancel(cancelled).expect(201);
+    expect(await visible()).toBe(true);
+
+    const completed = await confirm();
+    await testPool.query(
+      "update time_slots set starts_at=now()-interval '1 hour', ends_at=now()+interval '1 hour' where id=(select time_slot_id from matches where id=$1)",
+      [completed],
+    );
+    expect(await visible()).toBe(false);
+    await testPool.query(
+      "update time_slots set ends_at=now()-interval '1 minute' where id=(select time_slot_id from matches where id=$1)",
+      [completed],
+    );
+    expect(await visible()).toBe(false);
+    const lessons = (
+      await api().get('/api/matches').set(student.headers).expect(200)
+    ).body;
+    expect(
+      lessons.find((row: { id: string }) => row.id === completed).status,
+    ).toBe('completed');
+    expect(await visible()).toBe(false);
+    await cancel(completed).expect(409);
+
+    const laterOffer = await interest();
+    await propose(laterOffer);
+    await change(laterOffer, 'reject').expect(201);
+    expect(await visible()).toBe(false);
+    const laterMatch = await confirm();
+    await cancel(laterMatch).expect(201);
+    expect(await visible()).toBe(false);
+    expect(await visible(otherStudent)).toBe(true);
+  });
   it.each(
     ['student', 'tutor'].flatMap((shared) =>
       [
