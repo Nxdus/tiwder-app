@@ -577,7 +577,7 @@ function BookingListContent({
           />
         </>
       ) : (
-        <ul className="mx-auto mt-8 grid max-w-[520px] grid-cols-[repeat(auto-fill,152px)] justify-center gap-8">
+        <ul className="mx-auto mt-8 grid max-w-[1070px] grid-cols-[repeat(auto-fit,152px)] justify-center gap-x-10 gap-y-[50px]">
           {visible.map((item) => {
             const p = proposalOf(item);
             return (
@@ -589,6 +589,10 @@ function BookingListContent({
                   className="group relative block h-[270px] w-[152px] overflow-hidden rounded-2xl bg-secondary text-left text-foreground ring-1 ring-border transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
                   <TutorPhoto tutor={tutorOf(item)} />
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent opacity-0 group-has-[img[data-loaded=true]]:opacity-50"
+                  />
                   <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3 group-has-[img[data-loaded=true]]:text-white group-has-[img[data-loaded=true]]:[text-shadow:0_1px_3px_rgb(0_0_0/0.85)]">
                     <p
                       title={item.tutorName}
