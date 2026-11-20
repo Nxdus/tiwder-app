@@ -241,6 +241,217 @@ describe('Tiwder API', () => {
       },
     };
   }
+  it.each(['student', 'tutor'] as const)(
+    'hard-deletes a %s, anonymizes all states, and dismisses both lists once',
+    async (deletedRole) => {
+      const [student, tutor, otherStudent, otherTutor] = await Promise.all(
+        Array.from({ length: 4 }, () => account(randomUUID())),
+      );
+      const subjectId = (await api().get('/api/subjects')).body[0].id;
+      for (const person of [student, tutor, otherStudent, otherTutor]) {
+        const role =
+          person === student || person === otherStudent ? 'student' : 'tutor';
+        await api()
+          .post('/api/onboarding')
+          .set(person.headers)
+          .send({
+            role,
+            name: person.name,
+            phone: '0812345678',
+            bio: 'Private biography',
+            ...(role === 'student'
+              ? { gradeLevel: 'Grade 8' }
+              : {
+                  education: 'Degree',
+                  experienceYears: 3,
+                  hourlyRate: 400,
+                  teachings: [{ subjectId, skillLevel: 'Advanced' }],
+                }),
+          })
+          .expect(201);
+      }
+      const deleted = deletedRole === 'student' ? student : tutor;
+      const survivor = deletedRole === 'student' ? tutor : student;
+      const otherSurvivor =
+        deletedRole === 'student' ? otherTutor : otherStudent;
+      const interest = async (
+        s: typeof student,
+        t: typeof tutor,
+        status: typeof swipes.$inferInsert.status,
+      ) => {
+        const [row] = await db.db
+          .insert(swipes)
+          .values({
+            studentId: s.id,
+            tutorId: t.id,
+            subjectId,
+            studentName: s.name,
+            tutorName: t.name,
+            subjectName: 'Math',
+            skillLevel: 'Advanced',
+            hourlyRate: 400,
+            status,
+            ...(status === 'proposed'
+              ? { date: '2099-01-01', start: 60, end: 90 }
+              : {}),
+          })
+          .returning();
+        return row;
+      };
+      // Historical and active records must all disappear together.
+      for (const status of [
+        'rejected',
+        'withdrawn',
+        'closed',
+        'confirmed',
+        'expired',
+        'proposed',
+      ] as const)
+        await interest(student, tutor, status);
+      for (const status of ['confirmed', 'completed', 'cancelled'] as const) {
+        const row = await interest(student, tutor, 'confirmed');
+        const [slot] = await db.db
+          .insert(timeSlots)
+          .values({
+            tutorId: tutor.id,
+            date: '2099-01-01',
+            start: 60,
+            end: 90,
+            startsAt: new Date('2099-01-01T01:00:00+07:00'),
+            endsAt: new Date('2099-01-01T01:30:00+07:00'),
+            status: 'booked',
+          })
+          .returning();
+        await db.db.insert(matches).values({
+          interestId: row.id,
+          studentId: student.id,
+          tutorId: tutor.id,
+          timeSlotId: slot.id,
+          status,
+        });
+      }
+      await interest(
+        deletedRole === 'student' ? student : otherStudent,
+        deletedRole === 'student' ? otherTutor : tutor,
+        'pending',
+      );
+      const unrelated = await interest(otherStudent, otherTutor, 'pending');
+      const extraToken = randomUUID();
+      await db.db.insert(sessions).values({
+        userId: deleted.id,
+        tokenHash: digest(extraToken),
+        csrf: randomUUID(),
+        expiresAt: new Date(Date.now() + 600000),
+      });
+      await api()
+        .delete('/api/profile')
+        .send({ email: deleted.email })
+        .expect(401);
+      await api()
+        .delete('/api/profile')
+        .set('Cookie', deleted.headers.Cookie)
+        .set('Origin', origin)
+        .send({ email: deleted.email })
+        .expect(403);
+      for (const body of [
+        { email: survivor.email },
+        {},
+        { email: deleted.email, userId: survivor.id },
+      ])
+        await api()
+          .delete('/api/profile')
+          .set(deleted.headers)
+          .send(body)
+          .expect(400);
+      expect(
+        (await api().get('/api/auth/session').set(deleted.headers)).body.user
+          .id,
+      ).toBe(deleted.id);
+
+      const result = await api()
+        .delete('/api/profile')
+        .set(deleted.headers)
+        .send({ email: deleted.email })
+        .expect(200);
+      expect(result.headers['set-cookie']).toEqual(
+        expect.arrayContaining([expect.stringContaining('tiwder_session=;')]),
+      );
+      for (const cookie of [
+        deleted.headers.Cookie,
+        'tiwder_session=' + extraToken,
+      ])
+        expect(
+          (await api().get('/api/auth/session').set('Cookie', cookie)).body,
+        ).toEqual({ user: null });
+      for (const [table, condition] of [
+        ['users', 'id'],
+        ['students', 'user_id'],
+        ['tutors', 'user_id'],
+        ['sessions', 'user_id'],
+        ['teachings', 'tutor_id'],
+        ['time_slots', 'tutor_id'],
+        ['swipes', 'student_id'],
+        ['swipes', 'tutor_id'],
+        ['matches', 'student_id'],
+        ['matches', 'tutor_id'],
+        ['deleted_accounts', 'owner_id'],
+      ]) {
+        const { rows } = await testPool.query(
+          `SELECT count(*) FROM ${table} WHERE ${condition} = $1`,
+          [deleted.id],
+        );
+        expect(Number(rows[0].count)).toBe(0);
+      }
+      for (const path of ['/api/interests', '/api/matches']) {
+        const { body } = await api()
+          .get(path)
+          .set(survivor.headers)
+          .expect(200);
+        expect(body).toEqual([]);
+      }
+      const { body: notices } = await api()
+        .get('/api/deleted-accounts')
+        .set(survivor.headers)
+        .expect(200);
+      expect(notices).toHaveLength(2);
+      const accountId = notices[0].accountId;
+      expect(accountId).not.toBe(deleted.id);
+      expect(notices).toEqual(
+        expect.arrayContaining([
+          { accountId, kind: 'interests' },
+          { accountId, kind: 'matches' },
+        ]),
+      );
+      // Someone else cannot remove this owner's notices.
+      await api()
+        .delete('/api/deleted-accounts/' + accountId)
+        .set(otherSurvivor.headers)
+        .expect(200);
+      expect(
+        (await api().get('/api/deleted-accounts').set(survivor.headers)).body,
+      ).toHaveLength(2);
+      await api()
+        .delete('/api/deleted-accounts/' + accountId)
+        .set(survivor.headers)
+        .expect(200);
+      expect(
+        (await api().get('/api/deleted-accounts').set(survivor.headers)).body,
+      ).toEqual([]);
+      const others = await api()
+        .get('/api/interests')
+        .set(otherStudent.headers)
+        .expect(200);
+      expect(
+        others.body.some((row: { id: string }) => row.id === unrelated.id),
+      ).toBe(true);
+      // Deleting the remaining participant also clears notices they own.
+      await api()
+        .delete('/api/profile')
+        .set(survivor.headers)
+        .send({ email: survivor.email })
+        .expect(200);
+    },
+  );
   async function oauth() {
     const start = await api().get('/api/auth/google').expect(302);
     const url = new URL(start.headers.location);

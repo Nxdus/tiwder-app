@@ -20,6 +20,7 @@ const AuthContext = createContext<{
   error: string;
   refresh: () => Promise<Session>;
   logout: () => Promise<void>;
+  deleteAccount: (email: string) => Promise<void>;
 } | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -62,8 +63,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace("/");
     router.refresh();
   }
+  async function deleteAccount(email: string) {
+    await api("/profile", { method: "DELETE", body: JSON.stringify({ email }) }, session.csrfToken);
+    setSession({ user: null });
+    router.replace("/login");
+    router.refresh();
+    toast.add({ title: "Account deleted", type: "success" });
+  }
   return (
-    <AuthContext.Provider value={{ session, loading, error, refresh, logout }}>
+    <AuthContext.Provider value={{ session, loading, error, refresh, logout, deleteAccount }}>
       {children}
     </AuthContext.Provider>
   );

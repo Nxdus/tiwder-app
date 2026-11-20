@@ -13,6 +13,8 @@ import {
   CalendarX2,
   RotateCcw,
   Undo2,
+  Trash2,
+  UserRoundX,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -32,11 +34,13 @@ import {
   type Interest,
   type Match,
   type Proposal,
+  type DeletedAccount,
 } from "@/lib/api";
 import type { SearchOption, Tutor } from "@/lib/student/tutors";
 import type { Student } from "@/lib/tutor/students";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { toast } from "@/components/ui/toast";
 import {
   Empty,
@@ -181,6 +185,7 @@ function BookingListContent({
 }) {
   const { session, refresh: refreshSession } = useAuth();
   const [items, setItems] = useState<Lesson[]>([]);
+  const [deletedAccounts, setDeletedAccounts] = useState<DeletedAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -201,7 +206,12 @@ function BookingListContent({
       setError("");
     }
     try {
-      setItems(await api<Lesson[]>(`/${kind}`));
+      const [lessons, deleted] = await Promise.all([
+        api<Lesson[]>(`/${kind}`),
+        api<DeletedAccount[]>("/deleted-accounts"),
+      ]);
+      setItems(lessons);
+      setDeletedAccounts(deleted.filter((account) => account.kind === kind));
       hasData.current = true;
       setError("");
     } catch (cause) {
@@ -225,7 +235,11 @@ function BookingListContent({
     void load();
     const onFocus = () => void load();
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+    window.addEventListener("deleted-account-dismissed", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("deleted-account-dismissed", onFocus);
+    };
   }, [load]);
   useEffect(() => {
     const tick = () => setNow(Date.now());
@@ -233,6 +247,19 @@ function BookingListContent({
     const timer = window.setInterval(tick, 30000);
     return () => window.clearInterval(timer);
   }, []);
+  async function dismissAccount(accountId: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await api(`/deleted-accounts/${accountId}`, { method: "DELETE" }, session.csrfToken);
+      setDeletedAccounts((accounts) => accounts.filter((account) => account.accountId !== accountId));
+      window.dispatchEvent(new Event("deleted-account-dismissed"));
+    } catch (cause) {
+      toast.add({ title: "Unable to remove deleted account", description: cause instanceof Error ? cause.message : "Please try again.", type: "error" });
+    } finally {
+      setBusy(false);
+    }
+  }
   async function action(id: string, name: string) {
     setBusy(true);
     setError("");
@@ -426,7 +453,7 @@ function BookingListContent({
       {loading ? (
         <BookingListSkeleton tutor={role === "tutor"} />
       ) : !visible.length ? (
-        <Empty className="mx-auto max-w-md">
+        deletedAccounts.length ? null : <Empty className="mx-auto max-w-md">
           <EmptyHeader>
             <EmptyTitle>
               {error ? "Lessons could not be loaded" : noMatchesForStatus
@@ -626,6 +653,28 @@ function BookingListContent({
               </li>
             );
           })}
+        </ul>
+      )}
+      {!loading && deletedAccounts.length > 0 && (
+        <ul aria-label="Deleted accounts" className="mx-auto mt-8 grid max-w-[1070px] grid-cols-[repeat(auto-fit,minmax(min(100%,330px),330px))] justify-center gap-6">
+          {deletedAccounts.map(({ accountId }) => (
+            <li key={accountId}>
+              <Card className="h-full text-center">
+                <CardContent className="flex min-h-48 flex-col items-center justify-center gap-3">
+                  <UserRoundX aria-hidden="true" className="size-16 text-muted-foreground" />
+                  <h2 className="font-semibold">{role === "student" ? "Deleted tutor" : "Deleted student"}</h2>
+                  <p className="text-sm text-muted-foreground">{role === "student" ? "This tutor has deleted their account." : "This student has deleted their account."}</p>
+                </CardContent>
+                <CardFooter className="justify-center border-t">
+                  <Button variant="ghost" size="icon" disabled={busy}
+                    aria-label="Remove this deleted account from all requests and matches"
+                    onClick={() => void dismissAccount(accountId)}>
+                    <Trash2 className="size-5 text-destructive" aria-hidden="true" />
+                  </Button>
+                </CardFooter>
+              </Card>
+            </li>
+          ))}
         </ul>
       )}
       <CancelConfirmationDialog

@@ -83,12 +83,14 @@ function requireRole(user: Identity, role: Identity['role']) {
   if (user.role !== role) throw new ForbiddenException();
 }
 async function lockPair(tx: Tx, studentId: string, tutorId: string) {
-  await tx
+  const participants = await tx
     .select({ id: users.id })
     .from(users)
     .where(inArray(users.id, [studentId, tutorId]))
     .orderBy(asc(users.id))
     .for('update');
+  if (participants.length !== 2)
+    throw new NotFoundException('This account has been deleted');
 }
 async function settleMatches(tx: Tx, ids: string[]) {
   const ended = tx
@@ -221,6 +223,7 @@ export class BookingService {
         .from(swipes)
         .where(where)
         .for('update');
+      if (!row) throw new NotFoundException();
       if (row.status !== 'pending' && row.status !== 'proposed')
         throw new ConflictException('Interest already closed');
       if (

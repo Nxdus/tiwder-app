@@ -79,6 +79,15 @@ export const sessions = pgTable('sessions', {
   csrf: text().notNull(),
   expiresAt: instant(),
 });
+export const deletedAccounts = pgTable(
+  'deleted_accounts',
+  {
+    ownerId: userRef('owner_id'),
+    accountId: uuid('account_id').notNull(),
+    kind: text().$type<'interests' | 'matches'>().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.ownerId, t.accountId, t.kind] })],
+);
 export const oauthTransactions = pgTable('oauth_transactions', {
   state: text().primaryKey(),
   browserHash: text('browser_hash').notNull(),

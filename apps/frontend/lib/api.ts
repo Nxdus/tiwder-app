@@ -43,6 +43,7 @@ export type Profile = User & {
   teachings?: Teaching[];
 };
 export type Proposal = { date: string; start: number; end: number };
+export type DeletedAccount = { accountId: string; kind: "interests" | "matches" };
 export type StudentPreview = {
   id: string;
   name: string;
