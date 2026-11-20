@@ -110,7 +110,7 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
     const onFocus = () => void load();
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, [load]);
+  }, [load, session.user?.id, tab]);
   const availableTutors = useMemo(() => {
     const excluded = new Set(excludedTutorIds);
     return tutors.filter((tutor) => !excluded.has(tutor.id));
@@ -198,6 +198,7 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
       );
       const sentTutorId = pendingTutor.id;
       setExcludedTutorIds((previous) => [...previous, sentTutorId]);
+      setTutors((people) => people.filter((tutor) => tutor.id !== sentTutorId));
       setPendingTutor(null);
       toast.add({
         title: "Request sent",

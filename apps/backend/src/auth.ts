@@ -38,6 +38,8 @@ const cookie = (req: Request, name: string) =>
     ?.slice(name.length + 1) ?? '';
 const sessionKey = 'tiwder_session',
   flowKey = 'tiwder_oauth';
+export const clearSessionCookie = (res: Response) =>
+  res.clearCookie(sessionKey, cookieOptions());
 const scopes = [
   'openid',
   'https://www.googleapis.com/auth/userinfo.email',
@@ -222,7 +224,7 @@ export class AuthService {
     await this.database.db
       .delete(sessions)
       .where(eq(sessions.tokenHash, digest(cookie(req, sessionKey))));
-    res.clearCookie(sessionKey, cookieOptions());
+    clearSessionCookie(res);
   }
 }
 @Controller('auth')

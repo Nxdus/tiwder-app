@@ -11,7 +11,7 @@ import {
   Header,
   Injectable,
 } from '@nestjs/common';
-import { eq, asc, and } from 'drizzle-orm';
+import { eq, asc, and, inArray, notExists } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Request } from 'express';
 import { AuthService, type Identity } from './auth.js';
@@ -26,6 +26,8 @@ import {
   subjects,
   categories,
   contains,
+  swipes,
+  matches,
 } from './database/schema.js';
 export function parse<T>(schema: z.ZodType<T>, body: unknown): T {
   const result = schema.safeParse(body);
@@ -102,7 +104,8 @@ export class ProfileService {
     }
     return [...catalog.values()];
   }
-  async tutors() {
+  async tutors(user: Identity | null = null) {
+    const studentId = user?.role === 'student' ? user.id : null;
     const [people, entries, catalog] = await Promise.all([
       this.database.db
         .select({
@@ -117,7 +120,40 @@ export class ProfileService {
         })
         .from(users)
         .innerJoin(tutors, eq(tutors.userId, users.id))
-        .where(and(eq(users.onboarded, true), eq(users.role, 'tutor')))
+        .where(
+          and(
+            eq(users.onboarded, true),
+            eq(users.role, 'tutor'),
+            studentId
+              ? and(
+                  notExists(
+                    this.database.db
+                      .select({ id: swipes.id })
+                      .from(swipes)
+                      .where(
+                        and(
+                          eq(swipes.studentId, studentId),
+                          eq(swipes.tutorId, users.id),
+                          inArray(swipes.status, ['pending', 'proposed']),
+                        ),
+                      ),
+                  ),
+                  notExists(
+                    this.database.db
+                      .select({ id: matches.id })
+                      .from(matches)
+                      .where(
+                        and(
+                          eq(matches.studentId, studentId),
+                          eq(matches.tutorId, users.id),
+                          inArray(matches.status, ['confirmed', 'completed']),
+                        ),
+                      ),
+                  ),
+                )
+              : undefined,
+          ),
+        )
         .orderBy(asc(users.name), asc(users.id)),
       this.database.db.select().from(teachings),
       this.catalog(),
@@ -254,8 +290,10 @@ export class ProfileController {
   @Get('subjects') subjects() {
     return this.profiles.catalog();
   }
-  @Get('tutors') tutors() {
-    return this.profiles.tutors();
+  @Get('tutors') @Header('Cache-Control', 'no-store') async tutors(
+    @Req() req: Request,
+  ) {
+    return this.profiles.tutors((await this.auth.session(req)).user);
   }
   @Get('profile') @Header('Cache-Control', 'no-store') async profile(
     @Req() req: Request,

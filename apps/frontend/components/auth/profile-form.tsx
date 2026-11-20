@@ -11,6 +11,7 @@ import {
   UserRound,
 } from "lucide-react";
 import ProfilePhotos from "./profile-photos";
+import DeleteAccountDialog from "./delete-account-dialog";
 import {
   api,
   roleHome,
@@ -448,7 +449,8 @@ export default function ProfileForm({
                 </form>
               )}
             </CardContent>
-            <CardFooter className="flex justify-end border-t pt-6">
+            <CardFooter className="flex flex-wrap justify-end gap-3 border-t pt-6">
+              {!onboarding && <DeleteAccountDialog disabled={saving || preparingPhotos} />}
               <Button
                 type="submit"
                 form="profile-form"
