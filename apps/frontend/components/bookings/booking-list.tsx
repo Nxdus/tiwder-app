@@ -13,8 +13,6 @@ import {
   CalendarX2,
   RotateCcw,
   Undo2,
-  Trash2,
-  UserRoundX,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -25,6 +23,7 @@ import SubjectSearch from "@/components/student/discover/subject-search";
 import { BookingListSkeleton } from "@/components/loading/skeletons";
 import OfferConfirmationDialog from "@/components/student/discover/offer-confirmation-dialog";
 import CancelConfirmationDialog from "@/components/bookings/cancel-confirmation-dialog";
+import DeletedAccountCard from "@/components/bookings/deleted-account-card";
 import {
   api,
   ApiError,
@@ -40,7 +39,6 @@ import type { SearchOption, Tutor } from "@/lib/student/tutors";
 import type { Student } from "@/lib/tutor/students";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { toast } from "@/components/ui/toast";
 import {
   Empty,
@@ -375,7 +373,7 @@ function BookingListContent({
   );
   const selected =
     visible.find((item) => item.id === selectedId) ??
-    (selectedId === null && kind === "matches" && visible.length === 1
+    (selectedId === null && kind === "matches" && visible.length === 1 && !deletedAccounts.length
       ? visible[0]
       : null);
   const noMatchesForStatus = isFiltered && items.length > 0;
@@ -452,8 +450,8 @@ function BookingListContent({
       )}
       {loading ? (
         <BookingListSkeleton tutor={role === "tutor"} />
-      ) : !visible.length ? (
-        deletedAccounts.length ? null : <Empty className="mx-auto max-w-md">
+      ) : !visible.length && !deletedAccounts.length ? (
+        <Empty className="mx-auto max-w-md">
           <EmptyHeader>
             <EmptyTitle>
               {error ? "Lessons could not be loaded" : noMatchesForStatus
@@ -516,6 +514,11 @@ function BookingListContent({
               </li>
             );
           })}
+          {deletedAccounts.map(({ accountId }) => (
+            <li key={accountId} className="h-full">
+              <DeletedAccountCard tutorView busy={busy} onDismiss={() => void dismissAccount(accountId)} />
+            </li>
+          ))}
         </ul>
       ) : selected ? (
         <>
@@ -540,7 +543,7 @@ function BookingListContent({
               selected.status === "proposed" && Boolean(future(selected))
             }
             busy={busy}
-            showBack={kind === "interests" || visible.length > 1}
+            showBack={kind === "interests" || visible.length + deletedAccounts.length > 1}
           />
           <div className="mx-auto mt-4 w-full max-w-[330px]">
             {kind === "interests" && selected.status === "pending" && (
@@ -604,11 +607,11 @@ function BookingListContent({
           />
         </>
       ) : (
-        <ul className="mx-auto mt-8 grid max-w-[1070px] grid-cols-[repeat(auto-fit,152px)] justify-center gap-x-10 gap-y-[50px]">
+        <ul className="mx-auto mt-8 grid max-w-[536px] grid-cols-[repeat(auto-fit,152px)] justify-center gap-x-6 gap-y-[50px] sm:gap-x-10">
           {visible.map((item) => {
             const p = proposalOf(item);
             return (
-              <li key={item.id}>
+              <li key={item.id} className="h-full">
                 <button
                   type="button"
                   aria-label={`${item.tutorName}, ${status(item)}${p ? `, ${formatScheduleDate(p.date)}, ${formatMinutes(p.start)}–${formatMinutes(p.end)}` : ", Schedule not set"}`}
@@ -653,26 +656,9 @@ function BookingListContent({
               </li>
             );
           })}
-        </ul>
-      )}
-      {!loading && deletedAccounts.length > 0 && (
-        <ul aria-label="Deleted accounts" className="mx-auto mt-8 grid max-w-[1070px] grid-cols-[repeat(auto-fit,minmax(min(100%,330px),330px))] justify-center gap-6">
           {deletedAccounts.map(({ accountId }) => (
-            <li key={accountId}>
-              <Card className="h-full text-center">
-                <CardContent className="flex min-h-48 flex-col items-center justify-center gap-3">
-                  <UserRoundX aria-hidden="true" className="size-16 text-muted-foreground" />
-                  <h2 className="font-semibold">{role === "student" ? "Deleted tutor" : "Deleted student"}</h2>
-                  <p className="text-sm text-muted-foreground">{role === "student" ? "This tutor has deleted their account." : "This student has deleted their account."}</p>
-                </CardContent>
-                <CardFooter className="justify-center border-t">
-                  <Button variant="ghost" size="icon" disabled={busy}
-                    aria-label="Remove this deleted account from all requests and matches"
-                    onClick={() => void dismissAccount(accountId)}>
-                    <Trash2 className="size-5 text-destructive" aria-hidden="true" />
-                  </Button>
-                </CardFooter>
-              </Card>
+            <li key={accountId} className="h-full">
+              <DeletedAccountCard tutorView={false} busy={busy} onDismiss={() => void dismissAccount(accountId)} />
             </li>
           ))}
         </ul>
