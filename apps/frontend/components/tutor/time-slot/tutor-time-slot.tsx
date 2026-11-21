@@ -14,6 +14,7 @@ import { api, type Interest } from "@/lib/api";
 import { useAuth } from "@/components/auth/auth-provider";
 import { studentOf } from "@/components/bookings/booking-list";
 import { toast } from "@/components/ui/toast";
+import CancelConfirmationDialog from "@/components/bookings/cancel-confirmation-dialog";
 import {
   formatTime,
   isValidTimeRange,
@@ -43,6 +44,7 @@ export default function TutorTimeSlot({
     period: null,
   });
   const [saving, setSaving] = useState(false);
+  const [declineOpen, setDeclineOpen] = useState(false);
   const popupAnchor = useRef<HTMLDivElement>(null);
   const { session } = useAuth();
   const router = useRouter();
@@ -83,6 +85,7 @@ export default function TutorTimeSlot({
         { method: "POST", body },
         session.csrfToken,
       );
+      if (action === "reject") setDeclineOpen(false);
       toast.add({
         title: action === "reject" ? "Request declined" : "Proposal sent",
         description:
@@ -203,7 +206,7 @@ export default function TutorTimeSlot({
                 variant="destructive"
                 className="self-end"
                 disabled={saving}
-                onClick={() => void submitRequest("reject")}
+                onClick={() => setDeclineOpen(true)}
               >
                 Decline
               </Button>
@@ -243,6 +246,14 @@ export default function TutorTimeSlot({
           </div>
         )}
       </main>
+      <CancelConfirmationDialog
+        kind="request"
+        open={declineOpen}
+        onClose={() => setDeclineOpen(false)}
+        onConfirm={() => void submitRequest("reject")}
+        busy={saving}
+        targetName={interest.studentName}
+      />
     </div>
   );
 }

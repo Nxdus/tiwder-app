@@ -196,6 +196,7 @@ function BookingListContent({
     null,
   );
   const [lessonToCancel, setLessonToCancel] = useState<Lesson | null>(null);
+  const [requestToWithdraw, setRequestToWithdraw] = useState<Lesson | null>(null);
   const role = session.user?.role;
   const hasData = useRef(false);
   const load = useCallback(async () => {
@@ -259,6 +260,7 @@ function BookingListContent({
     }
   }
   async function action(id: string, name: string) {
+    if (busy) return;
     setBusy(true);
     setError("");
     try {
@@ -270,6 +272,7 @@ function BookingListContent({
       await load();
       setConfirmation(null);
       setLessonToCancel(null);
+      setRequestToWithdraw(null);
       if (name === "confirm") onConfirmed?.();
       toast.add({
         title: "Success",
@@ -555,7 +558,10 @@ function BookingListContent({
               <Button
                 variant="outline"
                 disabled={busy}
-                onClick={() => void action(selected.id, "withdraw")}
+                onClick={() => {
+                  setError("");
+                  setRequestToWithdraw(selected);
+                }}
                 className="h-11 w-full gap-2 rounded-2xl text-sm font-medium transition-all hover:bg-muted"
               >
                 <Undo2 className="size-4" />
@@ -669,6 +675,20 @@ function BookingListContent({
         </ul>
       )}
       </div>
+      <CancelConfirmationDialog
+        kind="withdraw"
+        open={requestToWithdraw !== null}
+        onClose={() => {
+          setRequestToWithdraw(null);
+          setError("");
+        }}
+        onConfirm={() => {
+          if (requestToWithdraw) void action(requestToWithdraw.id, "withdraw");
+        }}
+        busy={busy}
+        targetName={requestToWithdraw?.tutorName}
+        error={error}
+      />
       <CancelConfirmationDialog
         open={lessonToCancel !== null}
         onClose={() => {
