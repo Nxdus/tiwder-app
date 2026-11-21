@@ -850,7 +850,7 @@ describe('Tiwder API', () => {
         api()
           .post('/api/interests/' + id + '/proposal')
           .set(t.headers)
-          .send({ date: '2099-01-01', start: 90, end: 120 })
+          .send({ date: '2099-01-01', start: 180, end: 210 })
           .expect(201);
       const rejected = await fresh();
       await propose(rejected);
@@ -869,12 +869,16 @@ describe('Tiwder API', () => {
         .set(s.headers)
         .expect(201);
       const next = await fresh();
-      await propose(next);
+      const overlappingProposal = () =>
+        api()
+          .post('/api/interests/' + next + '/proposal')
+          .set(t.headers)
+          .send({ date: '2099-01-01', start: 90, end: 120 });
+      await overlappingProposal().expect(409);
       const confirm = () =>
         api()
           .post('/api/interests/' + next + '/confirm')
           .set(s.headers);
-      await confirm().expect(409);
       if (overlap === 'student') {
         await api()
           .post('/api/matches/' + match + '/cancel')
@@ -898,6 +902,7 @@ describe('Tiwder API', () => {
           .set(t.headers)
           .expect(409);
       }
+      await overlappingProposal().expect(201);
       await confirm().expect(201);
       expect(
         (await api().get('/api/matches').set(s.headers)).body.find(
@@ -911,6 +916,108 @@ describe('Tiwder API', () => {
             .set(pairs[1 - winner][0].headers)
         ).body.find((x: { id: string }) => x.id === ids[1 - winner]).status,
       ).toBe('proposed');
+    },
+  );
+  it.each(['student', 'tutor'])(
+    'rejects offers overlapping a confirmed lesson for the %s',
+    async (shared) => {
+      const people = await Promise.all(
+        Array.from({ length: 4 }, () => account(randomUUID())),
+      );
+      const [s1, s2, t1, t2] = people;
+      const subjectId = (await api().get('/api/subjects')).body[0].id;
+      for (const person of people) {
+        const role = person === s1 || person === s2 ? 'student' : 'tutor';
+        await api()
+          .post('/api/onboarding')
+          .set(person.headers)
+          .send({
+            role,
+            name: person.name,
+            phone: '0812345678',
+            bio: 'My bio',
+            ...(role === 'student'
+              ? { gradeLevel: 'Grade 8' }
+              : {
+                  education: 'Degree',
+                  experienceYears: 3,
+                  hourlyRate: 400,
+                  teachings: [{ subjectId, skillLevel: 'Advanced' }],
+                }),
+          })
+          .expect(201);
+      }
+      const create = async (student: typeof s1, tutor: typeof t1) =>
+        (
+          await api()
+            .post('/api/interests')
+            .set(student.headers)
+            .send({ tutorId: tutor.id, subjectId })
+            .expect(201)
+        ).body.id as string;
+      const first = await create(s1, t1);
+      await api()
+        .post(`/api/interests/${first}/proposal`)
+        .set(t1.headers)
+        .send({ date: '2099-01-01', start: 600, end: 660 })
+        .expect(201);
+      const confirmed = await api()
+        .post(`/api/interests/${first}/confirm`)
+        .set(s1.headers)
+        .expect(201);
+      const student = shared === 'student' ? s1 : s2;
+      const tutor = shared === 'tutor' ? t1 : t2;
+      const next = await create(student, tutor);
+      for (const [start, end] of [
+        [600, 660],
+        [630, 690],
+        [570, 630],
+        [630, 660],
+        [570, 690],
+      ]) {
+        await api()
+          .post(`/api/interests/${next}/proposal`)
+          .set(tutor.headers)
+          .send({ date: '2099-01-01', start, end })
+          .expect(409);
+      }
+      const { body: requests } = await api()
+        .get('/api/interests')
+        .set(tutor.headers)
+        .expect(200);
+      expect(
+        requests.find((item: { id: string }) => item.id === next).status,
+      ).toBe('pending');
+      // A touching boundary remains available.
+      await api()
+        .post(`/api/interests/${next}/proposal`)
+        .set(tutor.headers)
+        .send({ date: '2099-01-01', start: 660, end: 690 })
+        .expect(201);
+      await api()
+        .post(`/api/interests/${next}/reject`)
+        .set(student.headers)
+        .expect(201);
+      const anotherDay = await create(student, tutor);
+      await api()
+        .post(`/api/interests/${anotherDay}/proposal`)
+        .set(tutor.headers)
+        .send({ date: '2099-01-02', start: 600, end: 660 })
+        .expect(201);
+      await api()
+        .post(`/api/interests/${anotherDay}/reject`)
+        .set(student.headers)
+        .expect(201);
+      await api()
+        .post(`/api/matches/${confirmed.body.id}/cancel`)
+        .set(t1.headers)
+        .expect(201);
+      const afterCancel = await create(student, tutor);
+      await api()
+        .post(`/api/interests/${afterCancel}/proposal`)
+        .set(tutor.headers)
+        .send({ date: '2099-01-01', start: 600, end: 660 })
+        .expect(201);
     },
   );
   it.each([

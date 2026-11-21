@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { api, ApiError, type Interest } from "@/lib/api";
+import { api, ApiError, type Interest, type Match } from "@/lib/api";
+import { findBookingConflict } from "@/lib/tutor/time-slot/bookings";
 import { useAuth } from "@/components/auth/auth-provider";
 import { studentOf } from "@/components/bookings/booking-list";
 import { toast } from "@/components/ui/toast";
@@ -36,6 +37,31 @@ export default function TutorTimeSlot({
 }) {
   const initialDate = parseISO(today);
   const [requestError, setRequestError] = useState("");
+  const [bookings, setBookings] = useState<Match[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(true);
+  const [bookingError, setBookingError] = useState("");
+  useEffect(() => {
+    let active = true;
+    async function loadBookings() {
+      try {
+        const items = await api<Match[]>("/matches");
+        if (active) {
+          setBookings(items.filter((item) => item.status === "confirmed"));
+          setBookingError("");
+        }
+      } catch {
+        if (active) setBookingError("Cannot check bookings. Refresh to retry.");
+      } finally {
+        if (active) setLoadingBookings(false);
+      }
+    }
+    void loadBookings();
+    window.addEventListener("focus", loadBookings);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", loadBookings);
+    };
+  }, []);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
@@ -61,11 +87,15 @@ export default function TutorTimeSlot({
   const dateValue = date ? format(date, "yyyy-MM-dd") : null;
   const currentDay = getBangkokDate(now);
   const validationError = getScheduleFeedback(dateValue, startSelection, endSelection, now);
-  const ready = validationError === null;
+  const conflict = dateValue && start !== null && end !== null && end > start
+    ? findBookingConflict(bookings, { date: dateValue, start, end })
+    : undefined;
+  const ready = !loadingBookings && !bookingError && !validationError && !conflict;
   const dateLabel = date
     ? format(date, "EEEE, d MMM yyyy", { locale: enUS })
     : "";
-  const feedback = requestError || validationError;
+  const feedback = requestError || bookingError ||
+    (conflict ? "You have a class at this time." : validationError);
   async function submitRequest(action: "proposal" | "reject") {
     if (saving) return;
     setRequestError("");
@@ -74,6 +104,10 @@ export default function TutorTimeSlot({
       const selectionError = getScheduleFeedback(dateValue, startSelection, endSelection, new Date());
       if (selectionError || !dateValue || start === null || end === null) {
         setRequestError(selectionError ?? "Select a date and both times.");
+        return;
+      }
+      if (loadingBookings || bookingError || findBookingConflict(bookings, { date: dateValue, start, end })) {
+        setRequestError(bookingError || (loadingBookings ? "Checking booked times. Please wait." : "You have a class at this time."));
         return;
       }
       body = JSON.stringify({ date: dateValue, start, end });
@@ -181,8 +215,13 @@ export default function TutorTimeSlot({
                   value={startSelection}
                   popupAnchor={popupAnchor}
                   feedbackId={feedback ? "schedule-feedback" : undefined}
-                  disabled={saving}
-                  isUnavailable={() => false}
+                  disabled={saving || loadingBookings || Boolean(bookingError)}
+                  isUnavailable={(value) => {
+                    const minute = toMinutes(value);
+                    return Boolean(dateValue && minute !== null && bookings.some((booking) =>
+                      booking.date === dateValue && minute >= booking.start && minute < booking.end,
+                    ));
+                  }}
                   onChange={(value) => {
                     setStartSelection(value);
                     setRequestError("");
@@ -193,8 +232,12 @@ export default function TutorTimeSlot({
                   value={endSelection}
                   popupAnchor={popupAnchor}
                   feedbackId={feedback ? "schedule-feedback" : undefined}
-                  disabled={saving}
-                  isUnavailable={() => false}
+                  disabled={saving || loadingBookings || Boolean(bookingError)}
+                  isUnavailable={(value) => {
+                    const minute = toMinutes(value);
+                    return Boolean(dateValue && start !== null && minute !== null && minute > start &&
+                      findBookingConflict(bookings, { date: dateValue, start, end: minute }));
+                  }}
                   onChange={(value) => {
                     setEndSelection(value);
                     setRequestError("");
