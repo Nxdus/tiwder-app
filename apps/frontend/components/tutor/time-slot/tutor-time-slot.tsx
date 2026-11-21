@@ -3,20 +3,22 @@
 import Link from "next/link";
 import { format, isSameMonth, parseISO } from "date-fns";
 import { enUS } from "date-fns/locale";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, BanknoteArrowUp, Clock } from "lucide-react";
+import { ArrowLeft, BanknoteArrowUp, CircleAlert, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { api, type Interest } from "@/lib/api";
+import { api, ApiError, type Interest } from "@/lib/api";
 import { useAuth } from "@/components/auth/auth-provider";
 import { studentOf } from "@/components/bookings/booking-list";
 import { toast } from "@/components/ui/toast";
 import {
   formatTime,
-  isValidTimeRange,
+  getBangkokDate,
+  getScheduleFeedback,
+  getScheduleRequestError,
   toMinutes,
   type TimeSelection,
 } from "@/lib/tutor/time-slot/schedule";
@@ -32,6 +34,12 @@ export default function TutorTimeSlot({
   today: string;
 }) {
   const initialDate = parseISO(today);
+  const [requestError, setRequestError] = useState("");
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const [date, setDate] = useState<Date | undefined>(initialDate);
   const [month, setMonth] = useState(initialDate);
   const [startSelection, setStartSelection] = useState<TimeSelection>({
@@ -48,33 +56,25 @@ export default function TutorTimeSlot({
   const router = useRouter();
   const start = toMinutes(startSelection),
     end = toMinutes(endSelection);
-  const validRange = isValidTimeRange(start, end);
-  const ready = date !== undefined && validRange;
+  const dateValue = date ? format(date, "yyyy-MM-dd") : null;
+  const currentDay = getBangkokDate(now);
+  const validationError = getScheduleFeedback(dateValue, startSelection, endSelection, now);
+  const ready = validationError === null;
   const dateLabel = date
     ? format(date, "EEEE, d MMM yyyy", { locale: enUS })
     : "";
-  const feedback = !ready ? "Please select a date and time." : null;
+  const feedback = requestError || validationError;
   async function submitRequest(action: "proposal" | "reject") {
     if (saving) return;
+    setRequestError("");
     let body: string | undefined;
     if (action === "proposal") {
-      if (!date || start === null || end === null) {
-        toast.add({
-          title: "Incomplete selection",
-          description: "Please select a date and time.",
-          type: "warning",
-        });
+      const selectionError = getScheduleFeedback(dateValue, startSelection, endSelection, new Date());
+      if (selectionError || !dateValue || start === null || end === null) {
+        setRequestError(selectionError ?? "Select a date and both times.");
         return;
       }
-      if (!validRange) {
-        toast.add({
-          title: "Invalid time range",
-          description: "Time End must be later than Time Start.",
-          type: "error",
-        });
-        return;
-      }
-      body = JSON.stringify({ date: format(date, "yyyy-MM-dd"), start, end });
+      body = JSON.stringify({ date: dateValue, start, end });
     }
     setSaving(true);
     try {
@@ -93,12 +93,17 @@ export default function TutorTimeSlot({
       });
       router.push("/tutor/swiped");
     } catch (cause) {
+      const message = getScheduleRequestError(
+        cause instanceof ApiError ? cause.status : undefined,
+        cause instanceof Error ? cause.message : undefined,
+      );
+      setRequestError(message);
       toast.add({
         title:
           action === "reject"
             ? "Unable to decline request"
             : "Unable to send time proposal",
-        description: cause instanceof Error ? cause.message : undefined,
+        description: message,
         type: "error",
       });
     } finally {
@@ -139,6 +144,7 @@ export default function TutorTimeSlot({
                 selected={date}
                 onSelect={(next) => {
                   setDate(next);
+                  setRequestError("");
                 }}
                 locale={enUS}
                 today={initialDate}
@@ -147,7 +153,7 @@ export default function TutorTimeSlot({
                 disabled={(day) =>
                   saving ||
                   !isSameMonth(day, month) ||
-                  format(day, "yyyy-MM-dd") < today
+                  format(day, "yyyy-MM-dd") < currentDay
                 }
                 captionLayout="dropdown-months"
                 startMonth={initialDate}
@@ -176,6 +182,7 @@ export default function TutorTimeSlot({
                   isUnavailable={() => false}
                   onChange={(value) => {
                     setStartSelection(value);
+                    setRequestError("");
                   }}
                 />
                 <TimeSelect
@@ -187,6 +194,7 @@ export default function TutorTimeSlot({
                   isUnavailable={() => false}
                   onChange={(value) => {
                     setEndSelection(value);
+                    setRequestError("");
                   }}
                 />
               </div>
@@ -194,8 +202,9 @@ export default function TutorTimeSlot({
                 <p
                   id="schedule-feedback"
                   role="status"
-                  className="text-center text-sm text-muted-foreground"
+                  className="flex w-full items-start gap-2 px-1 text-sm font-medium text-red-600"
                 >
+                  <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                   {feedback}
                 </p>
               )}
