@@ -126,6 +126,11 @@ export async function api<T>(
           : "Unable to complete this request. Please try again.",
       response.status,
     );
+  if (
+    typeof window !== "undefined" &&
+    options.method?.toUpperCase() === "POST" &&
+    (path === "/interests" || path.startsWith("/interests/"))
+  ) window.dispatchEvent(new Event("interests-changed"));
   return body as T;
 }
 
