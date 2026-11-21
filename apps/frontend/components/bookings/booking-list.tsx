@@ -21,7 +21,7 @@ import TutorSwipeCard from "@/components/student/discover/tutor-swipe-card";
 import TutorPhoto from "@/components/student/discover/tutor-photo";
 import SubjectSearch from "@/components/student/discover/subject-search";
 import { BookingListSkeleton } from "@/components/loading/skeletons";
-import OfferConfirmationDialog from "@/components/student/discover/offer-confirmation-dialog";
+import BookingConfirmationDialog from "@/components/bookings/booking-confirmation-dialog";
 import CancelConfirmationDialog from "@/components/bookings/cancel-confirmation-dialog";
 import DeletedAccountCard from "@/components/bookings/deleted-account-card";
 import {
@@ -54,6 +54,7 @@ const labels: Record<string, string> = {
   proposed: "Waiting Approve",
   confirmed: "Upcoming",
   "in-progress": "In Progress",
+  "awaiting-confirmation": "Awaiting Confirmation",
   completed: "Completed",
   cancelled: "Cancelled",
   rejected: "Declined",
@@ -63,7 +64,7 @@ const labels: Record<string, string> = {
 };
 const statusOptions = [
   { value: "all", label: "All" },
-  ...["confirmed", "in-progress", "completed", "cancelled"].map((value) => ({
+  ...["confirmed", "in-progress", "awaiting-confirmation", "completed", "cancelled"].map((value) => ({
     value,
     label: labels[value],
   })),
@@ -72,6 +73,8 @@ const statusVariants: Record<string, ComponentProps<typeof Badge>["variant"]> = 
   pending: "warning",
   proposed: "info",
   confirmed: "info",
+  "in-progress": "info",
+  "awaiting-confirmation": "warning",
   completed: "success",
   cancelled: "destructive",
   rejected: "destructive",
@@ -82,6 +85,7 @@ const statusVariants: Record<string, ComponentProps<typeof Badge>["variant"]> = 
 function StatusIcon({ status }: { status: string }) {
   switch (status) {
     case "pending":
+    case "awaiting-confirmation":
       return <Clock aria-hidden="true" className="shrink-0" />;
     case "in-progress":
       return <CirclePlay aria-hidden="true" className="shrink-0" />;
@@ -196,6 +200,8 @@ function BookingListContent({
     null,
   );
   const [lessonToCancel, setLessonToCancel] = useState<Lesson | null>(null);
+  const [completionId, setCompletionId] = useState<string | null>(null);
+  const [dismissedCompletionIds, setDismissedCompletionIds] = useState<string[]>([]);
   const [requestToWithdraw, setRequestToWithdraw] = useState<Lesson | null>(null);
   const role = session.user?.role;
   const hasData = useRef(false);
@@ -269,6 +275,12 @@ function BookingListContent({
         { method: "POST" },
         session.csrfToken,
       );
+      if (name === "complete") {
+        setItems((current) => current.map((item) =>
+          item.id === id ? { ...item, status: "completed", contact: null } : item,
+        ));
+        setCompletionId(null);
+      }
       await load();
       setConfirmation(null);
       setLessonToCancel(null);
@@ -283,7 +295,9 @@ function BookingListContent({
               ? "Lesson cancelled successfully."
               : name === "reject"
                 ? "Lesson declined successfully."
-                : "Lesson updated successfully.",
+                : name === "complete"
+                  ? "Lesson marked as completed."
+                  : "Lesson updated successfully.",
         type: "success",
       });
     } catch (cause) {
@@ -345,12 +359,23 @@ function BookingListContent({
     const p = proposalOf(item);
     return (
       p &&
-      now > 0 &&
-      new Date(`${p.date}T${formatMinutes(p.start)}:00+07:00`).getTime() > now
+      new Date(`${p.date}T00:00:00+07:00`).getTime() + p.start * 60_000 > now
     );
   }
-  const lessonStatus = (item: Lesson) =>
-    item.status === "confirmed" && !future(item) ? "in-progress" : item.status;
+  function lessonStatus(item: Lesson) {
+    if (item.status !== "confirmed" || future(item)) return item.status;
+    const p = proposalOf(item);
+    return p && new Date(`${p.date}T00:00:00+07:00`).getTime() + p.end * 60_000 <= now
+      ? "awaiting-confirmation"
+      : "in-progress";
+  }
+  const awaitingCompletion = kind === "matches" && role === "student"
+    ? items.filter((item) => lessonStatus(item) === "awaiting-confirmation")
+    : [];
+  const completionLesson = !lessonToCancel
+    ? awaitingCompletion.find((item) => item.id === completionId) ??
+      awaitingCompletion.find((item) => !dismissedCompletionIds.includes(item.id))
+    : undefined;
   const status = (item: Lesson) => labels[lessonStatus(item)] ?? item.status;
   const showStatusFilter = kind === "matches";
   const isFiltered = showStatusFilter && statusFilter !== "all";
@@ -492,10 +517,10 @@ function BookingListContent({
                   href={`/tutor/time-slot?request=${item.id}`}
                   status={
                     <Badge
-                      variant={statusVariants[item.status] ?? "secondary"}
+                      variant={statusVariants[lessonStatus(item)] ?? "secondary"}
                       className="gap-1 text-xs"
                     >
-                      <CircleAlert />
+                      <StatusIcon status={lessonStatus(item)} />
                       {status(item)}
                     </Badge>
                   }
@@ -544,9 +569,9 @@ function BookingListContent({
             onAccept={() => setConfirmation("accept")}
             onReject={() => setConfirmation("reject")}
             appointment={proposalOf(selected)}
-            contact={"contact" in selected ? selected.contact : null}
+            contact={"contact" in selected && lessonStatus(selected) !== "awaiting-confirmation" ? selected.contact : null}
             statusLabel={status(selected)}
-            statusVariant={statusVariants[selected.status] ?? "secondary"}
+            statusVariant={statusVariants[lessonStatus(selected)] ?? "secondary"}
             canResolve={
               selected.status === "proposed" && Boolean(future(selected))
             }
@@ -581,6 +606,18 @@ function BookingListContent({
                   Cancel lesson
                 </Button>
               )}
+            {awaitingCompletion.some((item) => item.id === selected.id) && (
+              <Button
+                disabled={busy}
+                onClick={() => {
+                  setError("");
+                  setCompletionId(selected.id);
+                }}
+                className="h-11 w-full rounded-2xl"
+              >
+                Confirm attendance
+              </Button>
+            )}
             {kind === "matches" &&
               (selected.status === "cancelled" ||
                 selected.status === "completed") && (
@@ -603,7 +640,7 @@ function BookingListContent({
                 </Button>
               )}
           </div>
-          <OfferConfirmationDialog
+          <BookingConfirmationDialog
             confirmation={confirmation}
             onClose={() => {
               if (!busy) setConfirmation(null);
@@ -659,7 +696,7 @@ function BookingListContent({
                       )}
                     </div>
                     <Badge
-                      variant={statusVariants[item.status] ?? "secondary"}
+                      variant={statusVariants[lessonStatus(item)] ?? "secondary"}
                       className="h-auto max-w-full gap-1 whitespace-normal py-1 text-[11px] leading-4 [text-shadow:none]"
                     >
                       <StatusIcon status={lessonStatus(item)} />
@@ -678,6 +715,21 @@ function BookingListContent({
         </ul>
       )}
       </div>
+      <BookingConfirmationDialog
+        confirmation={completionLesson ? "complete" : null}
+        tutorName={completionLesson?.tutorName}
+        onClose={() => {
+          if (!completionLesson) return;
+          setDismissedCompletionIds((ids) => [...ids, completionLesson.id]);
+          setCompletionId(null);
+          setError("");
+        }}
+        onConfirm={() => {
+          if (completionLesson) void action(completionLesson.id, "complete");
+        }}
+        busy={busy}
+        error={error}
+      />
       <CancelConfirmationDialog
         kind="withdraw"
         open={requestToWithdraw !== null}

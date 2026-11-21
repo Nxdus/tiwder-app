@@ -92,22 +92,6 @@ async function lockPair(tx: Tx, studentId: string, tutorId: string) {
   if (participants.length !== 2)
     throw new NotFoundException('This account has been deleted');
 }
-async function settleMatches(tx: Tx, ids: string[]) {
-  const ended = tx
-    .select({ id: timeSlots.id })
-    .from(timeSlots)
-    .where(sql`${timeSlots.endsAt}<=clock_timestamp()`);
-  await tx
-    .update(matches)
-    .set({ status: 'completed', updatedAt: new Date() })
-    .where(
-      and(
-        eq(matches.status, 'confirmed'),
-        or(inArray(matches.studentId, ids), inArray(matches.tutorId, ids)),
-        inArray(matches.timeSlotId, ended),
-      ),
-    );
-}
 async function expire(tx: Tx, ids: string[]) {
   await tx
     .update(swipes)
@@ -241,8 +225,6 @@ export class BookingService {
           row.end === null
         )
           throw new ConflictException('No proposal to confirm');
-        const participants = [row.studentId, row.tutorId];
-        await settleMatches(tx, participants);
         const startsAt = slotTime(row.date, row.start);
         const endsAt = slotTime(row.date, row.end);
         const [active] = await tx
@@ -329,7 +311,6 @@ export class BookingService {
   }
   async matches(user: Identity) {
     return this.transaction(async (tx) => {
-      await settleMatches(tx, [user.id]);
       const rows = await tx
         .select({
           id: matches.id,
@@ -345,6 +326,7 @@ export class BookingService {
           date: timeSlots.date,
           start: timeSlots.start,
           end: timeSlots.end,
+          ended: sql<boolean>`${timeSlots.endsAt} <= current_timestamp`,
           email: users.email,
           phone: sql<string>`coalesce(${tutors.phone}, ${students.phone})`,
           matchedAt: matches.matchedAt,
@@ -370,24 +352,54 @@ export class BookingService {
         )
         .orderBy(
           sql`case
+            when ${matches.status} = 'confirmed' and ${timeSlots.endsAt} <= current_timestamp then 2
             when ${matches.status} = 'confirmed' and ${timeSlots.startsAt} <= current_timestamp then 0
             when ${matches.status} = 'confirmed' then 1
-            else 2
+            else 3
           end`,
-          sql`case when ${matches.status} = 'confirmed' then ${timeSlots.startsAt} end asc`,
+          sql`case when ${matches.status} = 'confirmed' and ${timeSlots.endsAt} > current_timestamp then ${timeSlots.startsAt} end asc`,
           sql`case
             when ${matches.status} = 'cancelled' then ${matches.updatedAt}
-            when ${matches.status} = 'completed' then ${timeSlots.endsAt}
+            else ${timeSlots.endsAt}
           end desc`,
           asc(matches.id),
         );
       return withProfiles(
         tx,
-        rows.map(({ email, phone, ...row }) => ({
+        rows.map(({ email, phone, ended, ...row }) => ({
           ...row,
-          contact: row.status === 'confirmed' ? { email, phone } : null,
+          contact: row.status === 'confirmed' && !ended ? { email, phone } : null,
         })),
       );
+    });
+  }
+  async complete(user: Identity, id: string) {
+    requireRole(user, 'student');
+    parse(z.uuid(), id);
+    const ownMatch = and(eq(matches.id, id), eq(matches.studentId, user.id));
+    return this.transaction(async (tx) => {
+      const [completed] = await tx
+        .update(matches)
+        .set({ status: 'completed', updatedAt: new Date() })
+        .from(timeSlots)
+        .where(
+          and(
+            ownMatch,
+            eq(matches.status, 'confirmed'),
+            eq(matches.timeSlotId, timeSlots.id),
+            sql`${timeSlots.endsAt} <= clock_timestamp()`,
+          ),
+        )
+        .returning({ id: matches.id });
+      if (completed) return completed;
+
+      const [match] = await tx
+        .select({ status: matches.status })
+        .from(matches)
+        .where(ownMatch);
+      if (!match) throw new NotFoundException();
+      if (match.status === 'completed') return { id };
+      throw new ConflictException('Lesson can only be confirmed after it ends');
     });
   }
   async cancel(user: Identity, id: string) {
@@ -465,5 +477,11 @@ export class BookingController {
     @Param('id') id: string,
   ) {
     return this.booking.cancel(await this.auth.require(req), id);
+  }
+  @Post('matches/:id/complete') async complete(
+    @Req() req: Request,
+    @Param('id') id: string,
+  ) {
+    return this.booking.complete(await this.auth.require(req), id);
   }
 }

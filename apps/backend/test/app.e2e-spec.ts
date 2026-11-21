@@ -56,7 +56,7 @@ describe('Tiwder API', () => {
   });
   afterEach(() => vi.restoreAllMocks());
   const api = () => request(app.getHttpServer());
-  it('orders matches by ongoing, upcoming, and latest history for both roles with stable ties', async () => {
+  it('orders ongoing, upcoming, awaiting confirmation and historical matches for both roles', async () => {
     const student = await account(randomUUID());
     const tutor = await account(randomUUID());
     const subjectId = (await api().get('/api/subjects')).body[0].id;
@@ -137,8 +137,8 @@ describe('Tiwder API', () => {
       ids[3],
       ...[ids[4], ids[7]].sort(),
       ids[0],
-      ids[2],
       ids[5],
+      ids[2],
       ids[1],
       ids[6],
     ];
@@ -636,22 +636,33 @@ describe('Tiwder API', () => {
     expect(await visible()).toBe(true);
 
     const completed = await confirm();
+    const complete = (person = student) =>
+      api().post(`/api/matches/${completed}/complete`).set(person.headers);
+    await complete().expect(409);
     await testPool.query(
       "update time_slots set starts_at=now()-interval '1 hour', ends_at=now()+interval '1 hour' where id=(select time_slot_id from matches where id=$1)",
       [completed],
     );
     expect(await visible()).toBe(false);
+    await complete().expect(409);
     await testPool.query(
       "update time_slots set ends_at=now()-interval '1 minute' where id=(select time_slot_id from matches where id=$1)",
       [completed],
     );
     expect(await visible()).toBe(false);
-    const lessons = (
-      await api().get('/api/matches').set(student.headers).expect(200)
-    ).body;
-    expect(
-      lessons.find((row: { id: string }) => row.id === completed).status,
-    ).toBe('completed');
+    const readMatch = async (person = student) => {
+      const lessons = (
+        await api().get('/api/matches').set(person.headers).expect(200)
+      ).body;
+      return lessons.find((row: { id: string }) => row.id === completed);
+    };
+    expect(await readMatch()).toMatchObject({ status: 'confirmed', contact: null });
+    expect(await readMatch(tutor)).toMatchObject({ status: 'confirmed', contact: null });
+    await complete(tutor).expect(403);
+    await complete(otherStudent).expect(404);
+    await Promise.all([complete().expect(201), complete().expect(201)]);
+    expect(await readMatch()).toMatchObject({ status: 'completed', contact: null });
+    expect(await readMatch(tutor)).toMatchObject({ status: 'completed', contact: null });
     expect(await visible()).toBe(false);
     await cancel(completed).expect(409);
 
