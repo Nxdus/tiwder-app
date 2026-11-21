@@ -92,6 +92,30 @@ async function lockPair(tx: Tx, studentId: string, tutorId: string) {
   if (participants.length !== 2)
     throw new NotFoundException('This account has been deleted');
 }
+async function ensureAvailable(
+  tx: Tx,
+  studentId: string,
+  tutorId: string,
+  startsAt: Date,
+  endsAt: Date,
+) {
+  const [active] = await tx
+    .select({ id: matches.id })
+    .from(matches)
+    .innerJoin(timeSlots, eq(timeSlots.id, matches.timeSlotId))
+    .where(
+      and(
+        eq(matches.status, 'confirmed'),
+        or(eq(matches.studentId, studentId), eq(matches.tutorId, tutorId)),
+        lt(timeSlots.startsAt, endsAt),
+        gt(timeSlots.endsAt, startsAt),
+      ),
+    );
+  if (active)
+    throw new ConflictException(
+      'This lesson overlaps another confirmed lesson for the student or tutor',
+    );
+}
 async function expire(tx: Tx, ids: string[]) {
   await tx
     .update(swipes)
@@ -202,11 +226,7 @@ export class BookingService {
       const [initial] = await tx.select().from(swipes).where(where);
       if (!initial) throw new NotFoundException();
       await lockPair(tx, initial.studentId, initial.tutorId);
-      const [row] = await tx
-        .select()
-        .from(swipes)
-        .where(where)
-        .for('update');
+      const [row] = await tx.select().from(swipes).where(where).for('update');
       if (!row) throw new NotFoundException();
       if (row.status !== 'pending' && row.status !== 'proposed')
         throw new ConflictException('Interest already closed');
@@ -227,25 +247,7 @@ export class BookingService {
           throw new ConflictException('No proposal to confirm');
         const startsAt = slotTime(row.date, row.start);
         const endsAt = slotTime(row.date, row.end);
-        const [active] = await tx
-          .select({ id: matches.id })
-          .from(matches)
-          .innerJoin(timeSlots, eq(timeSlots.id, matches.timeSlotId))
-          .where(
-            and(
-              eq(matches.status, 'confirmed'),
-              or(
-                eq(matches.studentId, row.studentId),
-                eq(matches.tutorId, row.tutorId),
-              ),
-              lt(timeSlots.startsAt, endsAt),
-              gt(timeSlots.endsAt, startsAt),
-            ),
-          );
-        if (active)
-          throw new ConflictException(
-            'This lesson overlaps another confirmed lesson for the student or tutor',
-          );
+        await ensureAvailable(tx, row.studentId, row.tutorId, startsAt, endsAt);
         const [slot] = await tx
           .insert(timeSlots)
           .values({
@@ -280,6 +282,13 @@ export class BookingService {
         const p = parse(proposalSchema, body);
         if (slotTime(p.date, p.start).getTime() <= Date.now())
           throw new BadRequestException('Start must be in the future');
+        await ensureAvailable(
+          tx,
+          row.studentId,
+          row.tutorId,
+          slotTime(p.date, p.start),
+          slotTime(p.date, p.end),
+        );
         await tx
           .update(swipes)
           .set({ ...p, status: 'proposed', updatedAt: new Date() })
