@@ -382,6 +382,11 @@ function BookingListContent({
   const listedItems = kind === "interests"
     ? items.filter((item) => item.status === "pending" || item.status === "proposed")
     : items;
+  if (kind === "interests" && role === "tutor") {
+    listedItems.sort((first, second) =>
+      Number(first.status === "proposed") - Number(second.status === "proposed"),
+    );
+  }
   const offeredSubjectIds = new Set(listedItems.map((item) => item.subjectId));
   const offeredChoices = offeredSubjectChoices?.filter((subject) =>
     offeredSubjectIds.has(subject.id),
