@@ -627,7 +627,10 @@ function BookingListContent({
                   type="button"
                   aria-label={`${item.tutorName}, ${status(item)}${p ? `, ${formatScheduleDate(p.date)}, ${formatMinutes(p.start)}–${formatMinutes(p.end)}` : ", Schedule not set"}`}
                   onClick={() => setSelectedId(item.id)}
-                  className="group relative block h-[270px] w-[152px] overflow-hidden rounded-2xl bg-secondary text-left text-foreground ring-1 ring-border transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className={cn(
+                    "group relative block h-[270px] w-[152px] cursor-pointer overflow-hidden rounded-2xl bg-secondary text-left text-foreground ring-1 ring-border transition-[translate,scale,box-shadow] duration-200 ease-out hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none",
+                    kind === "interests" && "hover:z-30 hover:shadow-[0_20px_45px_rgb(0_0_0/0.2)] focus-visible:z-30 focus-visible:shadow-[0_20px_45px_rgb(0_0_0/0.2)] motion-safe:hover:-translate-y-3 motion-safe:hover:scale-[1.05] motion-safe:focus-visible:-translate-y-3 motion-safe:focus-visible:scale-[1.05]",
+                  )}
                 >
                   <TutorPhoto tutor={tutorOf(item)} />
                   <div
