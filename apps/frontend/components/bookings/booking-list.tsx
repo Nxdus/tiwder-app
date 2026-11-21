@@ -387,11 +387,12 @@ function BookingListContent({
   return (
     <section
       aria-label={kind === "matches" ? "Your lessons" : "Lesson requests"}
-      className={
+      className={cn(
+        "mx-auto flex min-h-0 w-full flex-1 flex-col",
         role === "tutor"
-          ? "mx-auto w-full max-w-[1070px]"
-          : kind === "matches" ? "mx-auto w-full pt-8" : "mx-auto w-full"
-      }
+          ? "max-w-[1070px]"
+          : kind === "matches" && "pt-8",
+      )}
     >
       {offeredChoices && !selected && (
         <SubjectSearch
@@ -411,7 +412,10 @@ function BookingListContent({
         <div
           role="group"
           aria-label="Filter by lesson status"
-          className="mx-auto mb-8 flex flex-wrap items-center justify-center gap-2 sm:w-fit sm:flex-nowrap sm:gap-1 sm:rounded-full sm:border sm:border-border/70 sm:bg-muted/50 sm:p-1"
+          className={cn(
+            "mx-auto flex shrink-0 flex-wrap items-center justify-center gap-2 sm:w-fit sm:flex-nowrap sm:gap-1 sm:rounded-full sm:border sm:border-border/70 sm:bg-muted/50 sm:p-1",
+            role === "tutor" && "mb-8",
+          )}
         >
           {statusOptions.map(({ value, label }) => {
             const active = statusFilter === value;
@@ -448,6 +452,7 @@ function BookingListContent({
           })}
         </div>
       )}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
       {loading ? (
         <BookingListSkeleton tutor={role === "tutor"} />
       ) : !visible.length && !deletedAccounts.length ? (
@@ -663,6 +668,7 @@ function BookingListContent({
           ))}
         </ul>
       )}
+      </div>
       <CancelConfirmationDialog
         open={lessonToCancel !== null}
         onClose={() => {

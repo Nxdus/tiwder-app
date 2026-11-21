@@ -170,7 +170,7 @@ export default function TutorSwipeCard({
       aria-label="Discover tutors"
     >
       {details && showBack && (
-        <div className={tab === "Discover" ? "mb-8 flex h-12 items-center" : "mb-4"}>
+        <div className="mb-4">
           <Button
             variant="ghost"
             size="sm"
