@@ -95,7 +95,7 @@ export default function TutorTimeSlot({
     ? format(date, "EEEE, d MMM yyyy", { locale: enUS })
     : "";
   const feedback = requestError || bookingError ||
-    (conflict ? "You have a lesson at this time." : validationError);
+    (conflict ? "You have a class at this time." : validationError);
   async function submitRequest(action: "proposal" | "reject") {
     if (saving) return;
     setRequestError("");
@@ -107,7 +107,7 @@ export default function TutorTimeSlot({
         return;
       }
       if (loadingBookings || bookingError || findBookingConflict(bookings, { date: dateValue, start, end })) {
-        setRequestError(bookingError || (loadingBookings ? "Checking booked times. Please wait." : "You have a lesson at this time."));
+        setRequestError(bookingError || (loadingBookings ? "Checking booked times. Please wait." : "You have a class at this time."));
         return;
       }
       body = JSON.stringify({ date: dateValue, start, end });
