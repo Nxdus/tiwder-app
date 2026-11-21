@@ -86,7 +86,7 @@ export default function StudentCard({
       className={cn(
         "relative isolate flex h-full flex-col w-full gap-0 border-0 bg-card py-0 shadow-lg ring-0",
         selectable &&
-          "transition-[translate,box-shadow] duration-200 ease-out hover:shadow-xl focus-within:shadow-xl active:shadow-md motion-safe:hover:-translate-y-2 motion-safe:focus-within:-translate-y-2 motion-reduce:transition-none",
+          "cursor-pointer transition-[translate,scale,box-shadow] duration-200 ease-out hover:z-30 hover:shadow-[0_20px_45px_rgb(0_0_0/0.2)] focus-within:z-30 focus-within:shadow-[0_20px_45px_rgb(0_0_0/0.2)] active:shadow-md motion-safe:hover:-translate-y-3 motion-safe:hover:scale-[1.05] motion-safe:focus-within:-translate-y-3 motion-safe:focus-within:scale-[1.05] motion-reduce:transition-none",
         className,
       )}
     >
