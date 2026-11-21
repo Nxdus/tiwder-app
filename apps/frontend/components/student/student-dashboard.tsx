@@ -1,14 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import DiscoverHeader from "@/components/student/discover-header";
 import { AuthGate, useAuth } from "@/components/auth/auth-provider";
 import BookingList from "@/components/bookings/booking-list";
 import {
   api,
   ApiError,
+  roleHome,
   type Interest,
   type Match,
   type PublicTutor,
@@ -28,7 +28,19 @@ import TutorSwipeCard from "./discover/tutor-swipe-card";
 import ChooseSubjectDialog from "./discover/choose-subject-dialog";
 import { BookingListSkeleton, TutorCardSkeleton } from "@/components/loading/skeletons";
 
-export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" | "Matched" }) {
+type StudentTab = "Discover" | "Offered" | "Matched";
+
+export default function StudentDashboard({ tab }: { tab: StudentTab }) {
+  const { session, loading } = useAuth();
+  const user = session.user;
+  if (loading) return <TutorCardSkeleton />;
+  if (user?.role === "tutor") {
+    redirect(user.onboarded ? roleHome(user.role) : "/onboarding");
+  }
+  return <StudentDashboardContent tab={tab} />;
+}
+
+function StudentDashboardContent({ tab }: { tab: StudentTab }) {
   const router = useRouter();
   const { session, refresh: refreshSession } = useAuth();
   const [tutors, setTutors] = useState<Tutor[]>([]);
@@ -241,13 +253,6 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
           }
         }}
       />
-      {session.user?.role === "tutor" && (
-        <p className="mx-auto mt-5 max-w-3xl text-center text-sm">
-          <Link href="/tutor/swiped" className="underline">
-            Go to your tutor dashboard →
-          </Link>
-        </p>
-      )}
       {tab === "Discover" ? (
         <>
           <SubjectSearch
