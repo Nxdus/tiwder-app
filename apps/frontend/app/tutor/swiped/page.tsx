@@ -5,7 +5,7 @@ import TutorPageSkeleton from "@/components/loading/tutor-page-skeleton";
 export default function TutorSwipedPage() {
   return (
     <AuthGate role="tutor" fallback={<TutorPageSkeleton />}>
-      <main className="flex min-h-screen flex-col items-center gap-8 bg-white px-5 py-8 text-foreground sm:px-8">
+      <main className="flex h-dvh flex-col items-center gap-8 overflow-hidden bg-white px-5 py-8 text-foreground sm:px-8">
         <TutorHeader />
         <BookingList kind="interests" />
       </main>

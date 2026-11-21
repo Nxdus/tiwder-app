@@ -2,6 +2,7 @@
 
 import { Menu } from "lucide-react";
 import AccountButton from "@/components/auth/account-button";
+import { NotificationBadge, useNotificationCount } from "@/components/navigation/notification-badge";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +23,7 @@ export default function DiscoverHeader({
   onTabChange: (tab: string) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const count = useNotificationCount();
 
   useEffect(() => {
     const desktop = window.matchMedia("(min-width: 640px)");
@@ -32,7 +34,7 @@ export default function DiscoverHeader({
   }, []);
 
   return (
-    <header className="mx-auto flex w-full max-w-full items-center justify-between gap-8 sm:w-fit sm:justify-center">
+    <header className="relative z-30 mx-auto flex w-full max-w-full shrink-0 items-center justify-between gap-8 sm:w-fit sm:justify-center">
       <h1 className="text-3xl font-bold tracking-tight">Tiwder</h1>
       <nav
         className="hidden items-center justify-center gap-8 sm:flex"
@@ -44,9 +46,10 @@ export default function DiscoverHeader({
             aria-current={tab === item ? "page" : undefined}
             onClick={() => onTabChange(item)}
             variant={tab === item ? "default" : "secondary"}
-            className="h-8 rounded-full px-4 text-sm font-medium"
+            className="relative h-8 rounded-full px-4 text-sm font-medium"
           >
             {item}
+            {item === "Offered" && <NotificationBadge count={count} label="offers awaiting your response" />}
           </Button>
         ))}
       </nav>
@@ -60,12 +63,13 @@ export default function DiscoverHeader({
               <Button
                 variant="secondary"
                 size="icon"
-                className="rounded-full sm:hidden"
+                className="relative rounded-full sm:hidden"
                 aria-label="Open navigation"
               />
             }
           >
             <Menu />
+            <NotificationBadge count={count} label="offers awaiting your response" />
           </SheetTrigger>
           <SheetContent>
             <SheetHeader>
@@ -84,11 +88,12 @@ export default function DiscoverHeader({
                       aria-current={tab === item ? "page" : undefined}
                       onClick={() => onTabChange(item)}
                       variant="ghost"
-                      className="h-11 w-full justify-start rounded-lg px-4 aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground"
+                      className="relative h-11 w-full justify-start rounded-lg px-4 aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground"
                     />
                   }
                 >
                   {item}
+                  {item === "Offered" && <NotificationBadge count={count} label="offers awaiting your response" />}
                 </SheetClose>
               ))}
             </nav>

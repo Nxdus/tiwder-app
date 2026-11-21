@@ -177,7 +177,7 @@ export default function SubjectSearch({
     <section
       aria-hidden={hidden || undefined}
       inert={hidden || undefined}
-      className={`mx-auto mt-8 w-full max-w-[352px] ${hidden ? "hidden" : ""}`}
+      className={`relative z-20 mx-auto mt-8 w-full max-w-[352px] shrink-0 ${hidden ? "hidden" : ""}`}
     >
       <div ref={searchRef} className="relative">
         <div className="flex h-12 items-center gap-2 rounded-2xl border border-input bg-background px-3 shadow-xs transition-shadow focus-within:border-ring focus-within:ring-4 focus-within:ring-ring/10">

@@ -223,7 +223,7 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
     }
   }
   return (
-    <main className="min-h-screen overflow-x-clip bg-background px-5 py-8 text-foreground sm:px-8">
+    <main className="flex h-dvh flex-col overflow-hidden bg-background px-5 py-8 text-foreground sm:px-8">
       <DiscoverHeader
         tab={tab}
         onTabChange={(item) => {
@@ -255,6 +255,7 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
               setIndex(0);
             }}
           />
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {loading ? (
             <TutorCardSkeleton />
           ) : tutor ? (
@@ -304,6 +305,7 @@ export default function StudentDashboard({ tab }: { tab: "Discover" | "Offered" 
               </Button>
             </Empty>
           )}
+          </div>
           {pendingTutor && (
             <ChooseSubjectDialog
               key={`request:${pendingTutor.id}`}
