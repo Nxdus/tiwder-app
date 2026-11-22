@@ -56,7 +56,7 @@ describe('Tiwder API', () => {
   });
   afterEach(() => vi.restoreAllMocks());
   const api = () => request(app.getHttpServer());
-  it('orders ongoing, upcoming, awaiting confirmation and historical matches for both roles', async () => {
+  it('orders ongoing, upcoming, awaiting confirmation, completed and cancelled matches for both roles', async () => {
     const student = await account(randomUUID());
     const tutor = await account(randomUUID());
     const subjectId = (await api().get('/api/subjects')).body[0].id;
@@ -92,6 +92,7 @@ describe('Tiwder API', () => {
       ['confirmed', -120, -60, 0],
       ['cancelled', 7200, 7260, -5760],
       ['confirmed', 1440, 1500, 0],
+      ['completed', -150, -90, -10],
     ] as const;
     for (const [status, start, end, updated] of lessons) {
       const [interest] = await db.db
@@ -138,8 +139,9 @@ describe('Tiwder API', () => {
       ...[ids[4], ids[7]].sort(),
       ids[0],
       ids[5],
-      ids[2],
+      ids[8],
       ids[1],
+      ids[2],
       ids[6],
     ];
     for (const person of [student, tutor, student]) {

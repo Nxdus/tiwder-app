@@ -364,7 +364,8 @@ export class BookingService {
             when ${matches.status} = 'confirmed' and ${timeSlots.endsAt} <= current_timestamp then 2
             when ${matches.status} = 'confirmed' and ${timeSlots.startsAt} <= current_timestamp then 0
             when ${matches.status} = 'confirmed' then 1
-            else 3
+            when ${matches.status} = 'completed' then 3
+            else 4
           end`,
           sql`case when ${matches.status} = 'confirmed' and ${timeSlots.endsAt} > current_timestamp then ${timeSlots.startsAt} end asc`,
           sql`case
