@@ -400,6 +400,11 @@ function BookingListContent({
       (first.status === "pending" ? 0 : first.status === "proposed" ? 1 : 2) -
       (second.status === "pending" ? 0 : second.status === "proposed" ? 1 : 2),
     );
+  } else if (kind === "interests" && role === "student") {
+    listedItems.sort((first, second) =>
+      (first.status === "proposed" ? 0 : first.status === "pending" ? 1 : 2) -
+      (second.status === "proposed" ? 0 : second.status === "pending" ? 1 : 2),
+    );
   }
   const offeredSubjectIds = new Set(listedItems.map((item) => item.subjectId));
   const offeredChoices = offeredSubjectChoices?.filter((subject) =>
