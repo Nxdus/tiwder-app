@@ -315,7 +315,11 @@ export default function TutorTimeSlot({
         confirmDisabled={!ready}
         studentName={interest.studentName}
         summary={start !== null && end !== null
-          ? `${dateLabel} · ${formatTime(start)} – ${formatTime(end)} · ฿${(((end - start) / 60) * interest.hourlyRate).toLocaleString("en-US")}`
+          ? {
+              date: dateLabel,
+              time: `${formatTime(start)} – ${formatTime(end)}`,
+              fee: (((end - start) / 60) * interest.hourlyRate).toLocaleString("en-US"),
+            }
           : undefined}
         error={feedback || undefined}
       />

@@ -20,7 +20,7 @@ export default function BookingConfirmationDialog({
   busy?: boolean;
   tutorName?: string;
   studentName?: string;
-  summary?: string;
+  summary?: { date: string; time: string; fee: string };
   confirmDisabled?: boolean;
   error?: string;
 }) {
@@ -55,7 +55,16 @@ export default function BookingConfirmationDialog({
                 ? "Are you sure you want to decline this offer from your tutor? This offer will be removed."
                 : "Are you sure you want to confirm this match with your tutor? Your tutoring session will be confirmed."}
             </Dialog.Description>
-            {summary && <p className="mt-4 text-sm font-medium">{summary}</p>}
+            {summary && (
+              <div className="mt-4 space-y-2 text-sm">
+                <p className="text-muted-foreground">{summary.date}</p>
+                <p className="font-medium">{summary.time}</p>
+                <p className="pt-1">
+                  <span className="text-muted-foreground">Total lesson fee: </span>
+                  <span className="font-semibold">฿{summary.fee}</span>
+                </p>
+              </div>
+            )}
             {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
             <div className="mt-10 flex justify-end gap-3">
               <Dialog.Close
