@@ -16,6 +16,7 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { studentOf } from "@/components/bookings/booking-list";
 import { toast } from "@/components/ui/toast";
 import CancelConfirmationDialog from "@/components/bookings/cancel-confirmation-dialog";
+import BookingConfirmationDialog from "@/components/bookings/booking-confirmation-dialog";
 import {
   formatTime,
   getBangkokDate,
@@ -78,6 +79,8 @@ export default function TutorTimeSlot({
     period: null,
   });
   const [saving, setSaving] = useState(false);
+  const submitting = useRef(false);
+  const [offerOpen, setOfferOpen] = useState(false);
   const [declineOpen, setDeclineOpen] = useState(false);
   const popupAnchor = useRef<HTMLDivElement>(null);
   const { session } = useAuth();
@@ -97,7 +100,7 @@ export default function TutorTimeSlot({
   const feedback = requestError || bookingError ||
     (conflict ? "You have a class at this time." : validationError);
   async function submitRequest(action: "proposal" | "reject") {
-    if (saving) return;
+    if (submitting.current) return;
     setRequestError("");
     let body: string | undefined;
     if (action === "proposal") {
@@ -112,6 +115,7 @@ export default function TutorTimeSlot({
       }
       body = JSON.stringify({ date: dateValue, start, end });
     }
+    submitting.current = true;
     setSaving(true);
     try {
       await api(
@@ -120,6 +124,7 @@ export default function TutorTimeSlot({
         session.csrfToken,
       );
       if (action === "reject") setDeclineOpen(false);
+      else setOfferOpen(false);
       toast.add({
         title: action === "reject" ? "Request declined" : "Proposal sent",
         description:
@@ -144,6 +149,7 @@ export default function TutorTimeSlot({
         type: "error",
       });
     } finally {
+      submitting.current = false;
       setSaving(false);
     }
   }
@@ -291,13 +297,32 @@ export default function TutorTimeSlot({
             <Button
               size="lg"
               disabled={saving}
-              onClick={() => void submitRequest("proposal")}
+              onClick={() => {
+                setRequestError("");
+                setOfferOpen(true);
+              }}
             >
               {saving ? "Sending…" : "Confirm Time"}
             </Button>
           </div>
         )}
       </main>
+      <BookingConfirmationDialog
+        confirmation={offerOpen ? "proposal" : null}
+        onClose={() => setOfferOpen(false)}
+        onConfirm={() => void submitRequest("proposal")}
+        busy={saving}
+        confirmDisabled={!ready}
+        studentName={interest.studentName}
+        summary={start !== null && end !== null
+          ? {
+              date: dateLabel,
+              time: `${formatTime(start)} – ${formatTime(end)}`,
+              fee: (((end - start) / 60) * interest.hourlyRate).toLocaleString("en-US"),
+            }
+          : undefined}
+        error={feedback || undefined}
+      />
       <CancelConfirmationDialog
         kind="request"
         open={declineOpen}
