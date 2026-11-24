@@ -12,6 +12,7 @@ import PhotoIndicators from "@/components/ui/photo-indicators";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { Student } from "@/lib/tutor/students";
+import CancellationReason from "@/components/bookings/cancellation-reason";
 
 export default function StudentCard({
   student,
@@ -183,10 +184,7 @@ export default function StudentCard({
             {student.grade && <Badge variant="secondary">{student.grade}</Badge>}
           </div>
           {cancellationDetails}
-          <div className="min-h-20 space-y-2 rounded-xl bg-muted/60 p-3">
-            <p className="text-xs font-medium text-muted-foreground">Reason</p>
-            <p className="break-words whitespace-pre-wrap text-sm leading-relaxed">{cancelledReason || "No reason provided"}</p>
-          </div>
+          <CancellationReason reason={cancelledReason} />
           <div className="mt-1 flex flex-col gap-4">
             <Separator />
             <section aria-label={`Subject chosen by ${student.name}`} className="flex flex-col gap-2">

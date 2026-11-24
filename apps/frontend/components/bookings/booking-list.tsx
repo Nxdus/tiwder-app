@@ -22,6 +22,7 @@ import { BookingListSkeleton } from "@/components/loading/skeletons";
 import BookingConfirmationDialog from "@/components/bookings/booking-confirmation-dialog";
 import LessonCancellationDialog, { type CancellationInput } from "@/components/bookings/lesson-cancellation-dialog";
 import BookingPreviewCard from "@/components/bookings/booking-preview-card";
+import BookingBackButton from "@/components/bookings/booking-back-button";
 import CancelledLessonCard, { isCancelledBooking } from "@/components/bookings/cancelled-lesson-card";
 import DeletedAccountCard from "@/components/bookings/deleted-account-card";
 import {
@@ -511,8 +512,8 @@ function BookingListContent({
           )}
         </Empty>
       ) : selected && isCancelledBooking(selected) ? (
-        <div className="mx-auto w-full max-w-[330px] space-y-4">
-          <Button variant="ghost" onClick={() => setSelectedId("")}>Back to {kind === "matches" ? "matched" : role === "tutor" ? "swiped" : "offered"}</Button>
+        <div className="mx-auto mt-8 w-full max-w-[330px]">
+          <div className="mb-4"><BookingBackButton destination={kind === "matches" ? "matched" : role === "tutor" ? "swiped" : "offered"} onBack={() => setSelectedId("")} /></div>
           <CancelledLessonCard lesson={selected} tutorView={role === "tutor"} detail />
         </div>
       ) : role === "tutor" ? (
