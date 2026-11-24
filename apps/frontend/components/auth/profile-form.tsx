@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import ProfilePhotos from "./profile-photos";
 import DeleteAccountDialog from "./delete-account-dialog";
+import TeachingSubjects from "./teaching-subjects";
 import {
   api,
   roleHome,
@@ -24,7 +25,6 @@ import { useAuth } from "./auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
   FieldGroup,
@@ -99,6 +99,7 @@ export default function ProfileForm({
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [role, setRole] = useState<Role>(session.user?.role ?? "student");
   const [teachings, setTeachings] = useState<Record<string, SkillLevel>>({});
+  const [editingTeaching, setEditingTeaching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -141,7 +142,7 @@ export default function ProfileForm({
   }, []);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving || preparingPhotos) return;
+    if (saving || preparingPhotos || (role === "tutor" && editingTeaching)) return;
     setSaving(true);
     const savingToast = toast.add({
       title: "Saving profile…",
@@ -355,69 +356,13 @@ export default function ProfileForm({
                                   Payment is arranged outside Tiwder.
                                 </FieldDescription>
                               </Field>
-                              <FieldSet>
-                                <FieldLegend>Subjects you teach</FieldLegend>
-                                <FieldDescription>
-                                  Choose at least one subject and your teaching
-                                  level.
-                                </FieldDescription>
-                                <FieldGroup>
-                                  {subjects.map((subject) => (
-                                    <Field key={subject.id}>
-                                      <Field orientation="horizontal">
-                                        <Checkbox
-                                          id={`subject-${subject.id}`}
-                                          checked={Boolean(
-                                            teachings[subject.id],
-                                          )}
-                                          onCheckedChange={(checked) =>
-                                            setTeachings((previous) => {
-                                              const next = { ...previous };
-                                              if (checked)
-                                                next[subject.id] = "Beginner";
-                                              else delete next[subject.id];
-                                              return next;
-                                            })
-                                          }
-                                        />
-                                        <FieldLabel
-                                          htmlFor={`subject-${subject.id}`}
-                                        >
-                                          {subject.name}
-                                        </FieldLabel>
-                                      </Field>
-                                      {teachings[subject.id] && (
-                                        <>
-                                          <FieldLabel
-                                            htmlFor={`level-${subject.id}`}
-                                          >
-                                            Teaching level for {subject.name}
-                                          </FieldLabel>
-                                          <Choice
-                                            id={`level-${subject.id}`}
-                                            value={teachings[subject.id]}
-                                            onChange={(value) =>
-                                              setTeachings((previous) => ({
-                                                ...previous,
-                                                [subject.id]:
-                                                  value as SkillLevel,
-                                              }))
-                                            }
-                                            options={[
-                                              "Beginner",
-                                              "Intermediate",
-                                              "Advanced",
-                                            ].map((value) => ({
-                                              value,
-                                              label: value,
-                                            }))}
-                                          />
-                                        </>
-                                      )}
-                                    </Field>
-                                  ))}
-                                </FieldGroup>
-                              </FieldSet>
+                              <TeachingSubjects
+                                subjects={subjects}
+                                value={teachings}
+                                onChange={setTeachings}
+                                onEditingChange={setEditingTeaching}
+                                disabled={saving}
+                              />
                             </>
                           )}
                         </FieldGroup>
@@ -458,7 +403,7 @@ export default function ProfileForm({
                   !loaded ||
                   saving ||
                   preparingPhotos ||
-                  (role === "tutor" && !Object.keys(teachings).length)
+                  (role === "tutor" && (editingTeaching || !Object.keys(teachings).length))
                 }
               >
                 <Save data-icon="inline-start" />
