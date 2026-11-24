@@ -1132,4 +1132,74 @@ describe('Tiwder API', () => {
       ).toBe('pending');
     },
   );
+  it('allows tutors and onboarding users to add custom subjects without duplicating existing ones', async () => {
+    const [tutor, student] = await Promise.all([
+      account(randomUUID()),
+      account(randomUUID()),
+    ]);
+    await api()
+      .post('/api/onboarding')
+      .set(student.headers)
+      .send({
+        role: 'student',
+        name: student.name,
+        phone: '0812345678',
+        bio: 'Student bio',
+        gradeLevel: 'Grade 10',
+      })
+      .expect(201);
+    await api()
+      .post('/api/subjects')
+      .set(student.headers)
+      .send({ name: 'Forbidden Subject' })
+      .expect(403);
+
+    const created = (
+      await api()
+        .post('/api/subjects')
+        .set(tutor.headers)
+        .send({ name: '  Japanese   N3  ' })
+        .expect(201)
+    ).body;
+    expect(created.name).toBe('Japanese N3');
+    expect(created.categories).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'Other' })]),
+    );
+
+    const duplicate = (
+      await api()
+        .post('/api/subjects')
+        .set(tutor.headers)
+        .send({ name: 'japanese n3' })
+        .expect(201)
+    ).body;
+    expect(duplicate.id).toBe(created.id);
+
+    await api()
+      .post('/api/onboarding')
+      .set(tutor.headers)
+      .send({
+        role: 'tutor',
+        name: tutor.name,
+        phone: '0812345678',
+        bio: 'Teaching Japanese',
+        education: 'BA Japanese',
+        experienceYears: 2,
+        hourlyRate: 500,
+        teachings: [{ subjectId: created.id, skillLevel: 'Advanced' }],
+      })
+      .expect(201);
+
+    const tutors = (await api().get('/api/tutors').expect(200)).body;
+    const listedTutor = tutors.find(
+      (item: { id: string }) => item.id === tutor.id,
+    );
+    expect(listedTutor.teachings).toEqual([
+      expect.objectContaining({
+        subjectId: created.id,
+        skillLevel: 'Advanced',
+        subject: expect.objectContaining({ name: 'Japanese N3' }),
+      }),
+    ]);
+  });
 });
