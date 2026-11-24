@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Controller,
+  ForbiddenException,
   Get,
   Post,
   Patch,
@@ -11,7 +12,7 @@ import {
   Header,
   Injectable,
 } from '@nestjs/common';
-import { eq, asc, and, inArray, notExists } from 'drizzle-orm';
+import { eq, asc, and, inArray, notExists, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Request } from 'express';
 import { AuthService, type Identity } from './auth.js';
@@ -71,6 +72,12 @@ const tutor = z.object({
     ),
 });
 const profileSchema = z.discriminatedUnion('role', [student, tutor]);
+const subjectSchema = z
+  .object({
+    name: words(100),
+    categoryId: z.uuid().optional(),
+  })
+  .strict();
 @Injectable()
 export class ProfileService {
   constructor(
@@ -103,6 +110,73 @@ export class ProfileService {
       catalog.set(r.id, subject);
     }
     return [...catalog.values()];
+  }
+  async createSubject(user: Identity, body: unknown) {
+    if (user.role === 'student') {
+      throw new ForbiddenException('Only tutors can add subjects');
+    }
+    const { name, categoryId } = parse(subjectSchema, body);
+    const normalizedName = name.replace(/\s+/g, ' ');
+    const subjectId = await this.database.db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({ id: subjects.id })
+        .from(subjects)
+        .where(sql`lower(${subjects.name}) = ${normalizedName.toLowerCase()}`);
+      if (existing) return existing.id;
+
+      let resolvedCategoryId = categoryId;
+      if (resolvedCategoryId) {
+        const [category] = await tx
+          .select({ id: categories.id })
+          .from(categories)
+          .where(eq(categories.id, resolvedCategoryId));
+        if (!category) throw new BadRequestException('Unknown category');
+      } else {
+        const [other] = await tx
+          .select({ id: categories.id })
+          .from(categories)
+          .where(sql`lower(${categories.name}) = 'other'`);
+        if (other) {
+          resolvedCategoryId = other.id;
+        } else {
+          await tx
+            .insert(categories)
+            .values({ name: 'Other' })
+            .onConflictDoNothing();
+          const [createdCategory] = await tx
+            .select({ id: categories.id })
+            .from(categories)
+            .where(sql`lower(${categories.name}) = 'other'`);
+          resolvedCategoryId = createdCategory?.id;
+        }
+      }
+
+      const [inserted] = await tx
+        .insert(subjects)
+        .values({ name: normalizedName })
+        .onConflictDoNothing()
+        .returning({ id: subjects.id });
+      const id =
+        inserted?.id ??
+        (
+          await tx
+            .select({ id: subjects.id })
+            .from(subjects)
+            .where(
+              sql`lower(${subjects.name}) = ${normalizedName.toLowerCase()}`,
+            )
+        )[0]?.id;
+      if (!id) throw new ConflictException('Subject already exists');
+      if (resolvedCategoryId) {
+        await tx
+          .insert(contains)
+          .values({ subjectId: id, categoryId: resolvedCategoryId })
+          .onConflictDoNothing();
+      }
+      return id;
+    });
+    const catalog = await this.catalog();
+    return catalog.find((s) => s.id === subjectId)!;
   }
   async tutors(user: Identity | null = null) {
     const studentId = user?.role === 'student' ? user.id : null;
@@ -287,8 +361,17 @@ export class ProfileController {
     @Inject(ProfileService) private readonly profiles: ProfileService,
     @Inject(AuthService) private readonly auth: AuthService,
   ) {}
-  @Get('subjects') subjects() {
+  @Get('subjects') @Header('Cache-Control', 'no-store') subjects() {
     return this.profiles.catalog();
+  }
+  @Post('subjects') async createSubject(
+    @Req() req: Request,
+    @Body() body: unknown,
+  ) {
+    return this.profiles.createSubject(
+      await this.auth.require(req, true),
+      body,
+    );
   }
   @Get('tutors') @Header('Cache-Control', 'no-store') async tutors(
     @Req() req: Request,

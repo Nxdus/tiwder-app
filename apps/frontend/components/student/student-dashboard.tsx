@@ -130,7 +130,10 @@ function StudentDashboardContent({ tab }: { tab: StudentTab }) {
   const choices = useMemo(
     () =>
       subjects.flatMap((subject) =>
-        subject.categories.map((category) => ({
+        (subject.categories.length
+          ? subject.categories
+          : [{ id: "other", name: "Other" }]
+        ).map((category) => ({
           id: subject.id,
           name: subject.name,
           category: category.name,

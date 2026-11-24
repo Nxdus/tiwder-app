@@ -99,7 +99,6 @@ export default function ProfileForm({
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [role, setRole] = useState<Role>(session.user?.role ?? "student");
   const [teachings, setTeachings] = useState<Record<string, SkillLevel>>({});
-  const [editingTeaching, setEditingTeaching] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -142,7 +141,7 @@ export default function ProfileForm({
   }, []);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving || preparingPhotos || (role === "tutor" && editingTeaching)) return;
+    if (saving || preparingPhotos) return;
     setSaving(true);
     const savingToast = toast.add({
       title: "Saving profile…",
@@ -360,7 +359,16 @@ export default function ProfileForm({
                                 subjects={subjects}
                                 value={teachings}
                                 onChange={setTeachings}
-                                onEditingChange={setEditingTeaching}
+                                csrfToken={session.csrfToken}
+                                onSubjectCreated={(created) =>
+                                  setSubjects((previous) =>
+                                    previous.some((item) => item.id === created.id)
+                                      ? previous
+                                      : [...previous, created].sort((a, b) =>
+                                          a.name.localeCompare(b.name),
+                                        ),
+                                  )
+                                }
                                 disabled={saving}
                               />
                             </>
@@ -403,7 +411,7 @@ export default function ProfileForm({
                   !loaded ||
                   saving ||
                   preparingPhotos ||
-                  (role === "tutor" && (editingTeaching || !Object.keys(teachings).length))
+                  (role === "tutor" && !Object.keys(teachings).length)
                 }
               >
                 <Save data-icon="inline-start" />
