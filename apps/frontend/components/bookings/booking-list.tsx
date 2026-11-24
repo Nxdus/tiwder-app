@@ -45,6 +45,7 @@ import {
   EmptyDescription,
 } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
+import { isVisibleRequest } from "@/lib/booking-visibility";
 
 type Lesson = Interest | Match;
 const labels: Record<string, string> = {
@@ -378,7 +379,7 @@ function BookingListContent({
   const showStatusFilter = kind === "matches";
   const isFiltered = showStatusFilter && statusFilter !== "all";
   const listedItems = kind === "interests"
-    ? items.filter((item) => item.status === "pending" || item.status === "proposed" || isCancelledBooking(item))
+    ? items.filter((item) => "proposal" in item && isVisibleRequest(item, role))
     : items;
   if (kind === "interests" && role === "tutor") {
     listedItems.sort((first, second) =>
