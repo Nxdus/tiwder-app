@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  CalendarDays,
   CircleAlert,
   CircleCheck,
   CircleMinus,
@@ -18,19 +17,17 @@ import { useCallback, useEffect, useRef, useState, type ComponentProps } from "r
 import { useAuth } from "@/components/auth/auth-provider";
 import StudentCard from "@/components/tutor/student-card";
 import TutorSwipeCard from "@/components/student/discover/tutor-swipe-card";
-import TutorPhoto from "@/components/student/discover/tutor-photo";
 import SubjectSearch from "@/components/student/discover/subject-search";
 import { BookingListSkeleton } from "@/components/loading/skeletons";
 import BookingConfirmationDialog from "@/components/bookings/booking-confirmation-dialog";
 import LessonCancellationDialog, { type CancellationInput } from "@/components/bookings/lesson-cancellation-dialog";
+import BookingPreviewCard from "@/components/bookings/booking-preview-card";
 import CancelledLessonCard, { isCancelledBooking } from "@/components/bookings/cancelled-lesson-card";
 import DeletedAccountCard from "@/components/bookings/deleted-account-card";
 import {
   api,
   ApiError,
-  formatMinutes,
   formatSchedule,
-  formatScheduleDate,
   type Interest,
   type Match,
   type Proposal,
@@ -47,7 +44,7 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from "@/components/ui/empty";
-import { cn, formatCompactName } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 type Lesson = Interest | Match;
 const labels: Record<string, string> = {
@@ -679,54 +676,19 @@ function BookingListContent({
           {visible.map((item) => {
             const p = proposalOf(item);
             if (isCancelledBooking(item)) {
-              return <li key={item.id} className="h-full"><CancelledLessonCard lesson={item} onOpen={() => setSelectedId(item.id)} /></li>;
+              return <li key={item.id} className="h-full"><CancelledLessonCard lesson={item} onOpen={() => setSelectedId(item.id)} emphasizeHover={kind === "interests"} /></li>;
             }
             return (
               <li key={item.id} className="h-full">
-                <button
-                  type="button"
-                  aria-label={`${item.tutorName}, ${status(item)}${p ? `, ${formatScheduleDate(p.date)}, ${formatMinutes(p.start)}–${formatMinutes(p.end)}` : ", Schedule not set"}`}
-                  onClick={() => setSelectedId(item.id)}
-                  className={cn(
-                    "group relative block h-[270px] w-[152px] cursor-pointer overflow-hidden rounded-2xl bg-secondary text-left text-foreground ring-1 ring-border transition-[translate,scale,box-shadow] duration-200 ease-out hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none",
-                    kind === "interests" && "hover:z-30 hover:shadow-[0_20px_45px_rgb(0_0_0/0.2)] focus-visible:z-30 focus-visible:shadow-[0_20px_45px_rgb(0_0_0/0.2)] motion-safe:hover:-translate-y-3 motion-safe:hover:scale-[1.05] motion-safe:focus-visible:-translate-y-3 motion-safe:focus-visible:scale-[1.05]",
-                  )}
-                >
-                  <TutorPhoto tutor={tutorOf(item)} />
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent opacity-0 group-has-[img[data-loaded=true]]:opacity-50"
-                  />
-                  <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3 group-has-[img[data-loaded=true]]:text-white group-has-[img[data-loaded=true]]:[text-shadow:0_1px_3px_rgb(0_0_0/0.85)]">
-                    <p
-                      title={item.tutorName}
-                      className="truncate text-sm font-semibold leading-5"
-                    >
-                      {formatCompactName(item.tutorName)}
-                    </p>
-                    <div className="flex flex-col gap-1 text-xs leading-4 text-foreground/80 group-has-[img[data-loaded=true]]:text-white">
-                      <p className="flex items-start gap-1.5">
-                        <CalendarDays aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
-                        <span>{p ? formatScheduleDate(p.date) : "Schedule not set"}</span>
-                      </p>
-                      {p && (
-                        <p className="flex items-start gap-1.5">
-                          <Clock aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
-                          <span className="tabular-nums">
-                            {formatMinutes(p.start)}–{formatMinutes(p.end)}
-                          </span>
-                        </p>
-                      )}
-                    </div>
-                    <Badge
-                      variant={statusVariants[lessonStatus(item)] ?? "secondary"}
-                      className="h-auto max-w-full gap-1 whitespace-normal py-1 text-[11px] leading-4 [text-shadow:none]"
-                    >
-                      <StatusIcon status={lessonStatus(item)} />
-                      <span>{status(item)}</span>
-                    </Badge>
-                  </div>
-                </button>
+                <BookingPreviewCard
+                  tutor={tutorOf(item)}
+                  appointment={p}
+                  statusLabel={status(item)}
+                  statusVariant={statusVariants[lessonStatus(item)] ?? "secondary"}
+                  statusIcon={<StatusIcon status={lessonStatus(item)} />}
+                  onOpen={() => setSelectedId(item.id)}
+                  emphasizeHover={kind === "interests"}
+                />
               </li>
             );
           })}
