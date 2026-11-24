@@ -76,6 +76,20 @@ export const proposalSchema = z
   .object({ date: z.iso.date(), start: minute, end: minute })
   .strict()
   .refine((p) => p.start < p.end, 'Start must precede end');
+const cancellationSchema = z
+  .object({
+    reason: z.enum([
+      'Schedule conflict',
+      'Personal reasons',
+      'Health reasons',
+      'Other',
+    ]),
+    details: z.string().trim().max(300).optional(),
+  })
+  .strict()
+  .refine((value) => value.reason !== 'Other' || Boolean(value.details), {
+    message: 'Please describe your reason for cancelling',
+  });
 function slotTime(date: string, minute: number) {
   return new Date(Date.parse(date + 'T00:00:00+07:00') + minute * 60000);
 }
@@ -324,6 +338,7 @@ export class BookingService {
         .select({
           id: matches.id,
           status: matches.status,
+          cancellationReason: matches.cancellationReason,
           studentId: swipes.studentId,
           studentName: swipes.studentName,
           tutorId: swipes.tutorId,
@@ -378,7 +393,8 @@ export class BookingService {
         tx,
         rows.map(({ email, phone, ended, ...row }) => ({
           ...row,
-          contact: row.status === 'confirmed' && !ended ? { email, phone } : null,
+          contact:
+            row.status === 'confirmed' && !ended ? { email, phone } : null,
         })),
       );
     });
@@ -412,8 +428,15 @@ export class BookingService {
       throw new ConflictException('Lesson can only be confirmed after it ends');
     });
   }
-  async cancel(user: Identity, id: string) {
+  async cancel(user: Identity, id: string, body?: unknown) {
     parse(z.uuid(), id);
+    // Keep cancellation compatible with clients released before reasons were added.
+    const reason = body == null ? null : parse(cancellationSchema, body);
+    const cancellationReason = reason
+      ? reason.reason === 'Other'
+        ? reason.details!
+        : reason.reason
+      : null;
     return this.transaction(async (tx) => {
       const [row] = await tx
         .select({
@@ -437,7 +460,7 @@ export class BookingService {
       await lockPair(tx, row.student, row.tutor);
       const updated = await tx
         .update(matches)
-        .set({ status: 'cancelled', updatedAt: new Date() })
+        .set({ status: 'cancelled', cancellationReason, updatedAt: new Date() })
         .where(
           and(
             eq(matches.id, id),
@@ -485,8 +508,9 @@ export class BookingController {
   @Post('matches/:id/cancel') async cancel(
     @Req() req: Request,
     @Param('id') id: string,
+    @Body() body: unknown,
   ) {
-    return this.booking.cancel(await this.auth.require(req), id);
+    return this.booking.cancel(await this.auth.require(req), id, body);
   }
   @Post('matches/:id/complete') async complete(
     @Req() req: Request,

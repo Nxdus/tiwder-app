@@ -77,6 +77,7 @@ export type Interest = {
   proposal: Proposal | null;
 };
 export type Match = Proposal & {
+  cancellationReason: string | null;
   student: StudentPreview;
   tutor: TutorPreview;
   id: string;

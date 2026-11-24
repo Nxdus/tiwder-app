@@ -152,6 +152,96 @@ describe('Tiwder API', () => {
       expect(body.map((match: { id: string }) => match.id)).toEqual(expected);
     }
   });
+  it.each(['student', 'tutor'] as const)(
+    'stores cancellation reasons shared by both parties when the %s cancels',
+    async (actor) => {
+      const student = await account(randomUUID());
+      const tutor = await account(randomUUID());
+      const outsider = await account(randomUUID());
+      const subjectId = (await api().get('/api/subjects')).body[0].id;
+      for (const person of [student, tutor]) {
+        await api()
+          .post('/api/onboarding')
+          .set(person.headers)
+          .send({
+            role: person === student ? 'student' : 'tutor',
+            name: person.name,
+            phone: '0812345678',
+            bio: 'Cancellation test',
+            ...(person === student
+              ? { gradeLevel: 'Grade 8' }
+              : {
+                  education: 'Degree',
+                  experienceYears: 3,
+                  hourlyRate: 400,
+                  teachings: [{ subjectId, skillLevel: 'Advanced' }],
+                }),
+          })
+          .expect(201);
+      }
+      const interestId = (
+        await api()
+          .post('/api/interests')
+          .set(student.headers)
+          .send({ tutorId: tutor.id, subjectId })
+          .expect(201)
+      ).body.id;
+      await api()
+        .post(`/api/interests/${interestId}/proposal`)
+        .set(tutor.headers)
+        .send({ date: '2099-01-01', start: 600, end: 660 })
+        .expect(201);
+      const matchId = (
+        await api()
+          .post(`/api/interests/${interestId}/confirm`)
+          .set(student.headers)
+          .expect(201)
+      ).body.id;
+      const cancel = (person = actor === 'student' ? student : tutor) =>
+        api().post(`/api/matches/${matchId}/cancel`).set(person.headers);
+      await api()
+        .post('/api/onboarding')
+        .set(outsider.headers)
+        .send({
+          role: 'student',
+          name: outsider.name,
+          phone: '0812345678',
+          bio: 'Unrelated account',
+          gradeLevel: 'Grade 8',
+        })
+        .expect(201);
+      await cancel(outsider).send({ reason: 'Schedule conflict' }).expect(404);
+      for (const input of [
+        { reason: 'Other' },
+        { reason: 'Other', details: '   ' },
+        { reason: 'Other', details: 'x'.repeat(301) },
+        { reason: 'Invalid reason' },
+      ]) {
+        await cancel().send(input).expect(400);
+      }
+      const input =
+        actor === 'student'
+          ? { reason: 'Other', details: '  Exam moved to this time  ' }
+          : { reason: 'Schedule conflict' };
+      await cancel().send(input).expect(201);
+      await cancel().send(input).expect(409);
+      for (const person of [student, tutor]) {
+        const { body } = await api()
+          .get('/api/matches')
+          .set(person.headers)
+          .expect(200);
+        expect(
+          body.find((item: { id: string }) => item.id === matchId),
+        ).toMatchObject({
+          status: 'cancelled',
+          cancellationReason:
+            actor === 'student'
+              ? 'Exam moved to this time'
+              : 'Schedule conflict',
+        });
+      }
+    },
+  );
   it('persists profile photos, preserves them on other edits, and supports removal', async () => {
     const gmailAvatar = 'https://example.test/gmail-avatar.png';
     const person = await account('photo-test', gmailAvatar);
@@ -658,13 +748,25 @@ describe('Tiwder API', () => {
       ).body;
       return lessons.find((row: { id: string }) => row.id === completed);
     };
-    expect(await readMatch()).toMatchObject({ status: 'confirmed', contact: null });
-    expect(await readMatch(tutor)).toMatchObject({ status: 'confirmed', contact: null });
+    expect(await readMatch()).toMatchObject({
+      status: 'confirmed',
+      contact: null,
+    });
+    expect(await readMatch(tutor)).toMatchObject({
+      status: 'confirmed',
+      contact: null,
+    });
     await complete(tutor).expect(403);
     await complete(otherStudent).expect(404);
     await Promise.all([complete().expect(201), complete().expect(201)]);
-    expect(await readMatch()).toMatchObject({ status: 'completed', contact: null });
-    expect(await readMatch(tutor)).toMatchObject({ status: 'completed', contact: null });
+    expect(await readMatch()).toMatchObject({
+      status: 'completed',
+      contact: null,
+    });
+    expect(await readMatch(tutor)).toMatchObject({
+      status: 'completed',
+      contact: null,
+    });
     expect(await visible()).toBe(false);
     await cancel(completed).expect(409);
 

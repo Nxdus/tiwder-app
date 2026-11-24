@@ -23,6 +23,7 @@ import SubjectSearch from "@/components/student/discover/subject-search";
 import { BookingListSkeleton } from "@/components/loading/skeletons";
 import BookingConfirmationDialog from "@/components/bookings/booking-confirmation-dialog";
 import CancelConfirmationDialog from "@/components/bookings/cancel-confirmation-dialog";
+import LessonCancellationDialog, { type CancellationInput } from "@/components/bookings/lesson-cancellation-dialog";
 import DeletedAccountCard from "@/components/bookings/deleted-account-card";
 import {
   api,
@@ -265,14 +266,14 @@ function BookingListContent({
       setBusy(false);
     }
   }
-  async function action(id: string, name: string) {
+  async function action(id: string, name: string, cancellation?: CancellationInput) {
     if (busy) return;
     setBusy(true);
     setError("");
     try {
       await api(
         `/${kind}/${id}/${name}`,
-        { method: "POST" },
+        { method: "POST", ...(cancellation ? { body: JSON.stringify(cancellation) } : {}) },
         session.csrfToken,
       );
       if (name === "complete") {
@@ -535,14 +536,16 @@ function BookingListContent({
                     ) : undefined
                   }
                   actions={
-                    kind === "matches" &&
+                    item.status === "cancelled" && "cancellationReason" in item ? (
+                      <p className="text-sm break-words whitespace-pre-wrap"><span className="text-muted-foreground">Cancellation reason: </span>{item.cancellationReason || "No reason provided"}</p>
+                    ) : kind === "matches" &&
                       item.status === "confirmed" &&
                       future(item) ? (
                       <Button
                         size="sm"
                         variant="outline"
                         disabled={busy}
-                        onClick={() => setLessonToCancel(item)}
+                        onClick={() => { setError(""); setLessonToCancel(item); }}
                       >
                         Cancel lesson
                       </Button>
@@ -584,6 +587,9 @@ function BookingListContent({
             showBack={kind === "interests" || visible.length + deletedAccounts.length > 1}
           />
           <div className="mx-auto mt-4 w-full max-w-[330px]">
+            {selected.status === "cancelled" && "cancellationReason" in selected && (
+              <p className="mb-4 text-sm break-words whitespace-pre-wrap"><span className="text-muted-foreground">Cancellation reason: </span>{selected.cancellationReason || "No reason provided"}</p>
+            )}
             {kind === "interests" && selected.status === "pending" && (
               <Button
                 variant="outline"
@@ -604,7 +610,7 @@ function BookingListContent({
                 <Button
                   variant="outline"
                   disabled={busy}
-                  onClick={() => setLessonToCancel(selected)}
+                  onClick={() => { setError(""); setLessonToCancel(selected); }}
                   className="h-11 w-full gap-2 rounded-2xl border-destructive/30 text-sm font-medium text-destructive transition-all hover:bg-destructive/10 hover:text-destructive"
                 >
                   <CalendarX2 className="size-4" />
@@ -749,26 +755,26 @@ function BookingListContent({
         targetName={requestToWithdraw?.tutorName}
         error={error}
       />
-      <CancelConfirmationDialog
-        open={lessonToCancel !== null}
+      {lessonToCancel && <LessonCancellationDialog
+        key={lessonToCancel.id}
         onClose={() => {
           if (!busy) {
             setLessonToCancel(null);
             setError("");
           }
         }}
-        onConfirm={() => {
-          if (lessonToCancel) void action(lessonToCancel.id, "cancel");
-        }}
+        onConfirm={(input) => action(lessonToCancel.id, "cancel", input)}
+        schedule={formatSchedule(proposalOf(lessonToCancel)!)}
+        error={error}
         busy={busy}
         targetName={
           lessonToCancel
             ? role === "tutor"
               ? lessonToCancel.studentName
               : lessonToCancel.tutorName
-            : undefined
+            : ""
         }
-      />
+      />}
     </section>
   );
 }

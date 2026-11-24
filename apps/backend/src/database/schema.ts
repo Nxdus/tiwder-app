@@ -47,7 +47,10 @@ export const users = pgTable('users', {
   email: text().notNull(),
   name: text().notNull(),
   avatarUrl: text('avatar_url'),
-  photos: text('photos').array().notNull().default(sql`'{}'::text[]`),
+  photos: text('photos')
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
   role: role(),
   onboarded: boolean().notNull().default(false),
 });
@@ -188,6 +191,7 @@ export const matches = pgTable(
       .notNull()
       .references(() => timeSlots.id),
     status: matchStatus().notNull().default('confirmed'),
+    cancellationReason: text('cancellation_reason'),
     matchedAt: timestamp('matched_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
