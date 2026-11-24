@@ -24,6 +24,7 @@ export default function StudentCard({
   className,
   cancelledReason,
   cancellationDetails,
+  requestContext,
   onOpen,
 }: {
   student: Student;
@@ -35,6 +36,7 @@ export default function StudentCard({
   className?: string;
   cancelledReason?: string | null;
   cancellationDetails?: ReactNode;
+  requestContext?: ReactNode;
   onOpen?: () => void;
 }) {
   const photos = student.photos?.length
@@ -205,6 +207,7 @@ export default function StudentCard({
               <Badge variant="secondary">{student.grade}</Badge>
             </div>
           </div>
+          {requestContext ? <div className="flex min-h-11 w-full items-center">{requestContext}</div> : <>
           {student.phone ? (
             <a
               href={`tel:${student.phone.replaceAll("-", "")}`}
@@ -233,6 +236,7 @@ export default function StudentCard({
               Available after confirmation
             </p>
           )}
+          </>}
         </div>
         <Separator />
         <section

@@ -10,11 +10,11 @@ import {
   BanknoteArrowUp,
   CalendarPlus,
   CalendarX2,
-  RotateCcw,
   Undo2,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/auth/auth-provider";
 import StudentCard from "@/components/tutor/student-card";
 import TutorSwipeCard from "@/components/student/discover/tutor-swipe-card";
@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
 import { isVisibleRequest } from "@/lib/booking-visibility";
+import RequestContext from "@/components/bookings/request-context";
 
 type Lesson = Interest | Match;
 const labels: Record<string, string> = {
@@ -171,7 +172,13 @@ export function LessonBadges({
 }
 export default function BookingList(props: ComponentProps<typeof BookingListContent>) {
   const { session } = useAuth();
-  return <BookingListContent key={`${props.kind}:${session.user?.id}`} {...props} />;
+  return <Suspense fallback={<BookingListSkeleton tutor={session.user?.role === "tutor"} />}><BookingListRoute {...props} /></Suspense>;
+}
+
+function BookingListRoute(props: ComponentProps<typeof BookingListContent>) {
+  const { session } = useAuth();
+  const search = useSearchParams();
+  return <BookingListContent key={`${props.kind}:${session.user?.id}:${search.get("request") ?? ""}`} {...props} />;
 }
 
 function BookingListContent({
@@ -183,11 +190,12 @@ function BookingListContent({
 }: {
   kind: "interests" | "matches";
   onConfirmed?: () => void;
-  onRequested?: () => void;
+  onRequested?: (requestId?: string) => void;
   offeredSubjectChoices?: Tutor["subjects"];
   loadingOfferedSubjects?: boolean;
 }) {
   const { session, refresh: refreshSession } = useAuth();
+  const search = useSearchParams();
   const [items, setItems] = useState<Lesson[]>([]);
   const [deletedAccounts, setDeletedAccounts] = useState<DeletedAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -197,7 +205,7 @@ function BookingListContent({
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSearch, setSelectedSearch] = useState<SearchOption[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => kind === "interests" ? search.get("request") : null);
   const [confirmation, setConfirmation] = useState<"accept" | "reject" | null>(
     null,
   );
@@ -269,7 +277,7 @@ function BookingListContent({
       setBusy(false);
     }
   }
-  async function action(id: string, name: string, cancellation?: CancellationInput) {
+  async function action(id: string, name: string, cancellation?: CancellationInput | Proposal) {
     if (busy || actionPending.current) return;
     actionPending.current = true;
     setBusy(true);
@@ -297,9 +305,11 @@ function BookingListContent({
       setRequestToWithdraw(null);
       if (name === "confirm") onConfirmed?.();
       toast.add({
-        title: name === "remove" ? "Request removed" : "Success",
+        title: name === "remove" ? "Request removed" : name === "request-time" ? "New time requested" : "Success",
         description:
-          name === "remove"
+          name === "request-time"
+            ? "Your tutor will propose another time."
+            : name === "remove"
             ? "Removed from your list."
             : name === "confirm"
             ? "Lesson confirmed successfully."
@@ -329,26 +339,36 @@ function BookingListContent({
     }
   }
   async function requestAgain(item: Lesson) {
+    if (busy || actionPending.current) return;
+    actionPending.current = true;
     setBusy(true);
     setError("");
     try {
-      await api(
+      const interests = await api<Interest[]>("/interests");
+      const existing = interests.find((request) => request.tutorId === item.tutorId && request.subjectId === item.subjectId && (request.status === "pending" || request.status === "proposed"));
+      if (existing) {
+        toast.add({ title: "Request already open", description: "Opening your existing request.", type: "info" });
+        onRequested?.(existing.id);
+        return;
+      }
+      const result = await api<{ id: string; reused?: boolean }>(
         "/interests",
         {
           method: "POST",
           body: JSON.stringify({
             tutorId: item.tutorId,
             subjectId: item.subjectId,
+            ...(!("proposal" in item) && item.status === "cancelled" ? { previousMatchId: item.id } : {}),
           }),
         },
         session.csrfToken,
       );
       toast.add({
-        title: "Request sent",
-        description: "Your lesson request has been sent.",
+        title: result.reused ? "Request already open" : "Request sent",
+        description: result.reused ? "Opening your existing request." : "Your lesson request has been sent.",
         type: "success",
       });
-      onRequested?.();
+      onRequested?.(result.id);
     } catch (cause) {
       const message =
         cause instanceof ApiError && cause.status === 409
@@ -365,6 +385,7 @@ function BookingListContent({
       if (cause instanceof ApiError && cause.status === 401)
         void refreshSession().catch(() => {});
     } finally {
+      actionPending.current = false;
       setBusy(false);
     }
   }
@@ -533,6 +554,10 @@ function BookingListContent({
         <div className="mx-auto mt-8 w-full max-w-[330px]">
           <div className="mb-4"><BookingBackButton destination={kind === "matches" ? "matched" : role === "tutor" ? "swiped" : "offered"} onBack={() => setSelectedId("")} /></div>
           <CancelledLessonCard lesson={selected} tutorView={role === "tutor"} detail />
+          {kind === "matches" && role === "student" && selected.status === "cancelled" && <>
+            <Button className="mt-4 h-11 w-full gap-2 rounded-2xl" disabled={busy} onClick={() => void requestAgain(selected)}><CalendarPlus aria-hidden="true" className="size-4" />Request another lesson</Button>
+            {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+          </>}
           {kind === "interests" && <Button
             variant="outline"
             className="mt-4 h-11 w-full gap-2 rounded-2xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
@@ -551,6 +576,7 @@ function BookingListContent({
               <li key={item.id} className="h-full">
                 <StudentCard
                   student={studentOf(item)}
+                  requestContext={"proposal" in item && item.status === "pending" && item.previousProposal ? <RequestContext request={item} tutorView /> : undefined}
                   selectable={kind === "interests" && item.status === "pending"}
                   href={`/tutor/time-slot?request=${item.id}`}
                   status={
@@ -608,6 +634,7 @@ function BookingListContent({
             onMatch={() => {}}
             onAccept={() => setConfirmation("accept")}
             onReject={() => { setError(""); setLessonToCancel(selected); }}
+            requestContext={"proposal" in selected ? <RequestContext request={selected} /> : undefined}
             appointment={proposalOf(selected)}
             contact={"contact" in selected && lessonStatus(selected) !== "awaiting-confirmation" ? selected.contact : null}
             statusLabel={status(selected)}
@@ -662,24 +689,13 @@ function BookingListContent({
               </Button>
             )}
             {kind === "matches" &&
-              (selected.status === "cancelled" ||
-                selected.status === "completed") && (
+              selected.status === "completed" && (
                 <Button
                   disabled={busy}
                   onClick={() => void requestAgain(selected)}
                   className="h-11 w-full gap-2 rounded-2xl text-sm font-semibold shadow-xs transition-transform active:scale-[0.99]"
                 >
-                  {selected.status === "completed" ? (
-                    <>
-                      <CalendarPlus className="size-4" />
-                      Book again
-                    </>
-                  ) : (
-                    <>
-                      <RotateCcw className="size-4" />
-                      Request new time
-                    </>
-                  )}
+                  <CalendarPlus className="size-4" />Book again
                 </Button>
               )}
           </div>
@@ -695,6 +711,7 @@ function BookingListContent({
               )
             }
             busy={busy}
+            error={error}
           />
         </>
       ) : (
@@ -709,6 +726,7 @@ function BookingListContent({
                 <BookingPreviewCard
                   tutor={tutorOf(item)}
                   appointment={p}
+                  unscheduledLabel={"previousProposal" in item && item.status === "pending" && item.previousProposal ? "Waiting for a new time offer" : "Schedule not set"}
                   statusLabel={status(item)}
                   statusVariant={statusVariants[lessonStatus(item)] ?? "secondary"}
                   statusIcon={<StatusIcon status={lessonStatus(item)} />}
@@ -772,6 +790,9 @@ function BookingListContent({
           }
         }}
         onConfirm={(input) => action(lessonToCancel.id, kind === "matches" ? "cancel" : "reject", input)}
+        onRequestAnotherTime={kind === "interests" && role === "student" && lessonToCancel.status === "proposed"
+          ? () => action(lessonToCancel.id, "request-time", proposalOf(lessonToCancel)!)
+          : undefined}
         schedule={proposalOf(lessonToCancel) ? formatSchedule(proposalOf(lessonToCancel)!) : "Schedule not set"}
         error={error}
         busy={busy}

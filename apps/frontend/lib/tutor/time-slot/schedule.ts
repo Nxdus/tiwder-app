@@ -48,6 +48,7 @@ export function getScheduleFeedback(
 }
 
 const scheduleRequestErrors: Record<string, string> = {
+  "Choose a different time from the previous offer.": "Same time as before. Choose another.",
   "Start must be in the future": "Choose a future start time (Bangkok).",
   "Start must precede end": "End time must be after start time.",
   "Interest already closed": "Request closed. Return to Swiped.",

@@ -16,7 +16,7 @@ import {
   Timer,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ComponentProps } from "react";
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Tutor } from "@/lib/student/tutors";
@@ -45,6 +45,7 @@ export default function TutorSwipeCard({
   canResolve = true,
   busy = false,
   showBack = true,
+  requestContext,
 }: {
   tutor: Tutor;
   tab: string;
@@ -64,6 +65,7 @@ export default function TutorSwipeCard({
   canResolve?: boolean;
   busy?: boolean;
   showBack?: boolean;
+  requestContext?: ReactNode;
 }) {
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -321,6 +323,7 @@ export default function TutorSwipeCard({
                     </Badge>
                   )}
                 </div>
+                {requestContext && <div className="mt-3">{requestContext}</div>}
                 <div className="mt-2.5 space-y-2">
                   <p className="flex items-center gap-2">
                     <GraduationCap className="size-4" />
@@ -410,21 +413,23 @@ export default function TutorSwipeCard({
           <div className="mt-8 flex justify-between px-3">
             <Button
               variant="destructive"
-              aria-label="Reject offer"
+              aria-label="Cancel request"
+              title="Cancel request"
               onClick={() => onReject()}
               disabled={busy}
               className="h-16 w-[120px] rounded-full"
             >
-              <X className="size-12" />
+              <X aria-hidden="true" className="size-12" />
             </Button>
             <Button
               variant="default"
               aria-label="Accept offer"
+              title="Accept offer"
               onClick={() => onAccept()}
               disabled={busy}
               className="h-16 w-[120px] rounded-full"
             >
-              <Check className="size-12" />
+              <Check aria-hidden="true" className="size-12" />
             </Button>
           </div>
         )

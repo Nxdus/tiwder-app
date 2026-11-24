@@ -56,6 +56,133 @@ describe('Tiwder API', () => {
   });
   afterEach(() => vi.restoreAllMocks());
   const api = () => request(app.getHttpServer());
+  it('reuses an open request for another time and creates a separate request after a cancelled lesson', async () => {
+    const student = await account(randomUUID());
+    const tutor = await account(randomUUID());
+    const outsider = await account(randomUUID());
+    await api()
+      .post('/api/onboarding')
+      .set(outsider.headers)
+      .send({
+        role: 'student',
+        name: outsider.name,
+        phone: '0812345678',
+        bio: 'Other student',
+        gradeLevel: 'University',
+      })
+      .expect(201);
+    const subjectId = (await api().get('/api/subjects')).body[0].id;
+    for (const person of [student, tutor]) {
+      await api()
+        .post('/api/onboarding')
+        .set(person.headers)
+        .send({
+          role: person === student ? 'student' : 'tutor',
+          name: person.name,
+          phone: '0812345678',
+          bio: 'Retry flow',
+          ...(person === student
+            ? { gradeLevel: 'University' }
+            : {
+                education: 'Degree',
+                experienceYears: 3,
+                hourlyRate: 400,
+                teachings: [{ subjectId, skillLevel: 'Advanced' }],
+              }),
+        })
+        .expect(201);
+    }
+    const payload = { tutorId: tutor.id, subjectId };
+    const id = (
+      await api()
+        .post('/api/interests')
+        .set(student.headers)
+        .send(payload)
+        .expect(201)
+    ).body.id;
+    const oldTime = { date: '2099-02-01', start: 120, end: 150 };
+    const nextTime = { ...oldTime, start: 180, end: 240 };
+    const change = (action: string, person = student) =>
+      api().post(`/api/interests/${id}/${action}`).set(person.headers);
+    await change('request-time').send(oldTime).expect(409);
+    await change('proposal', tutor).send(oldTime).expect(201);
+    await change('request-time', tutor).send(oldTime).expect(403);
+    await change('request-time').send(nextTime).expect(409);
+    const responses = await Promise.all([
+      change('request-time').send(oldTime),
+      change('request-time').send(oldTime),
+    ]);
+    expect(responses.map((r) => r.status)).toEqual([201, 201]);
+    for (const person of [student, tutor]) {
+      const row = (
+        await api().get('/api/interests').set(person.headers)
+      ).body.find((r: { id: string }) => r.id === id);
+      expect(row).toMatchObject({
+        status: 'pending',
+        proposal: null,
+        previousProposal: oldTime,
+        previousMatchId: null,
+      });
+    }
+    await change('confirm').expect(409);
+    await change('proposal', tutor).send(oldTime).expect(409);
+    await change('proposal', tutor).send(nextTime).expect(201);
+    await change('request-time').send(oldTime).expect(409);
+    const matchId = (await change('confirm').expect(201)).body.id;
+    await api()
+      .post('/api/interests')
+      .set(student.headers)
+      .send({ ...payload, previousMatchId: matchId })
+      .expect(409);
+    await api()
+      .post(`/api/matches/${matchId}/cancel`)
+      .set(tutor.headers)
+      .send({ reason: 'Timing issues' })
+      .expect(201);
+    await api()
+      .post('/api/interests')
+      .set(outsider.headers)
+      .send({ ...payload, previousMatchId: matchId })
+      .expect(404);
+    const retry = () =>
+      api()
+        .post('/api/interests')
+        .set(student.headers)
+        .send({ ...payload, previousMatchId: matchId });
+    const retries = await Promise.all([retry(), retry()]);
+    expect(retries.map((r) => r.status)).toEqual([201, 201]);
+    const newId = retries[0].body.id;
+    expect(newId).not.toBe(id);
+    expect(retries[1].body.id).toBe(newId);
+    const list = (await api().get('/api/interests').set(student.headers)).body;
+    expect(
+      list.filter((r: { status: string }) => r.status === 'pending'),
+    ).toHaveLength(1);
+    expect(list.find((r: { id: string }) => r.id === newId)).toMatchObject({
+      previousMatchId: matchId,
+      previousProposal: nextTime,
+      proposal: null,
+      status: 'pending',
+    });
+    const history = (await api().get('/api/matches').set(student.headers)).body;
+    expect(history.find((r: { id: string }) => r.id === matchId)).toMatchObject(
+      { status: 'cancelled', cancellationReason: 'Timing issues' },
+    );
+    await api()
+      .post(`/api/interests/${newId}/proposal`)
+      .set(tutor.headers)
+      .send(nextTime)
+      .expect(201);
+    expect((await retry().expect(201)).body).toMatchObject({
+      id: newId,
+      reused: true,
+    });
+    await api()
+      .post('/api/interests')
+      .set(student.headers)
+      .send(payload)
+      .expect(409);
+  });
   it('orders ongoing, upcoming, awaiting confirmation, completed and cancelled matches for both roles', async () => {
     const student = await account(randomUUID());
     const tutor = await account(randomUUID());

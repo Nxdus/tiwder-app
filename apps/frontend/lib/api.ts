@@ -62,6 +62,8 @@ export type TutorPreview = {
   bio: string;
 };
 export type Interest = {
+  previousProposal: Proposal | null;
+  previousMatchId: string | null;
   updatedAt: string;
   cancellationReason: string | null;
   student: StudentPreview;
