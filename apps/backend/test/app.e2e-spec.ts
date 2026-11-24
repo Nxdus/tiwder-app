@@ -242,6 +242,79 @@ describe('Tiwder API', () => {
       }
     },
   );
+  it('keeps cancelled requests and their reasons in both interest lists without creating matched lessons', async () => {
+    const student = await account(randomUUID());
+    const tutor = await account(randomUUID());
+    const subjectId = (await api().get('/api/subjects')).body[0].id;
+    for (const person of [student, tutor]) {
+      await api()
+        .post('/api/onboarding')
+        .set(person.headers)
+        .send({
+          role: person === student ? 'student' : 'tutor',
+          name: person.name,
+          phone: '0812345678',
+          bio: 'Request cancellation',
+          ...(person === student
+            ? { gradeLevel: 'Grade 8' }
+            : {
+                education: 'Degree',
+                experienceYears: 3,
+                hourlyRate: 400,
+                teachings: [{ subjectId, skillLevel: 'Advanced' }],
+              }),
+        })
+        .expect(201);
+    }
+    for (const scenario of [
+      'tutor-decline',
+      'student-withdraw',
+      'student-decline-offer',
+    ]) {
+      const id = (
+        await api()
+          .post('/api/interests')
+          .set(student.headers)
+          .send({ tutorId: tutor.id, subjectId })
+          .expect(201)
+      ).body.id;
+      if (scenario === 'student-decline-offer') {
+        await api()
+          .post(`/api/interests/${id}/proposal`)
+          .set(tutor.headers)
+          .send({ date: '2099-01-01', start: 600, end: 660 })
+          .expect(201);
+      }
+      const action = scenario === 'student-withdraw' ? 'withdraw' : 'reject';
+      const actor = scenario === 'tutor-decline' ? tutor : student;
+      const cancel = () =>
+        api().post(`/api/interests/${id}/${action}`).set(actor.headers);
+      await cancel().send({ reason: 'Other', details: ' ' }).expect(400);
+      await cancel()
+        .send({ reason: 'Other', details: '  Unable to attend  ' })
+        .expect(201);
+      await cancel().send({ reason: 'Health reasons' }).expect(409);
+      for (const person of [student, tutor]) {
+        const interests = (
+          await api().get('/api/interests').set(person.headers).expect(200)
+        ).body;
+        expect(
+          interests.find((item: { id: string }) => item.id === id),
+        ).toMatchObject({
+          status: action === 'withdraw' ? 'withdrawn' : 'rejected',
+          cancellationReason: 'Unable to attend',
+          proposal:
+            scenario === 'student-decline-offer'
+              ? { date: '2099-01-01', start: 600, end: 660 }
+              : null,
+        });
+        expect(
+          (await api().get('/api/matches').set(person.headers).expect(200))
+            .body,
+        ).toEqual([]);
+      }
+    }
+  });
   it('persists profile photos, preserves them on other edits, and supports removal', async () => {
     const gmailAvatar = 'https://example.test/gmail-avatar.png';
     const person = await account('photo-test', gmailAvatar);

@@ -6,7 +6,8 @@ Cancel lesson → choose a reason → Continue → review → Confirm cancellati
 
 - Choose Schedule conflict, Personal reasons, Health reasons, or Other (required text, up to 300 characters).
 - Both roles can cancel a future confirmed lesson. The reason is stored in the database and returned to both participants.
-- Cancelled cards show only Cancelled status, the other participant's name, the lesson date/time, and the reason. Profile pictures, contact information, biography, pricing and booking actions are omitted from these cancelled cards.
+- Cancelled cards retain the original role-specific photo and card size. Only the name, schedule, cancellation status and reason are shown; contact information, biography, subject and price are hidden. Open a cancelled card to read the complete reason. There is no delete button.
+- Cancelled requests (declined/withdrawn) remain in Tutor Swiped / Student Offered. Cancelled confirmed lessons remain in both participants' Matched pages. Each cancellation is shown on the page where the request or lesson belongs.
 - No cancellation notification bell or notification delivery is included in this alternative.
 - Existing cancelled lessons without a reason display “No reason provided”.
 
@@ -21,7 +22,7 @@ Stop both dev servers with Ctrl+C before switching branches, then restart them. 
 
 ```powershell
 git switch feature/cancellation-reason-card
-# Idea 1: compact cancelled cards, no cancellation notifications.
+# Idea 1: photo cards with cancellation reasons, no cancellation notifications.
 
 git switch feature/cancellation-notifications
 # Idea 2: regular cards with cancellation notifications.
@@ -33,6 +34,6 @@ These are alternative implementations, not two PRs to merge together. This previ
 
 ## Validation
 
-- Backend lint/build and 24 integration tests, including invalid/empty/long reasons, both cancellation roles, participant access and persistence.
+- Backend lint/build and 25 integration tests, including invalid/empty/long reasons, both cancellation roles, participant access and persistence. Request cancellation tests cover tutor decline, student withdrawal, and student decline of a time offer, with reasons visible to both parties only in the interest lists.
 - Frontend ESLint and TypeScript checks.
 - Browser interaction and production frontend build have not been verified.

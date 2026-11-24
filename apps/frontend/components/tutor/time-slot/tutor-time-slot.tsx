@@ -15,7 +15,7 @@ import { findBookingConflict } from "@/lib/tutor/time-slot/bookings";
 import { useAuth } from "@/components/auth/auth-provider";
 import { studentOf } from "@/components/bookings/booking-list";
 import { toast } from "@/components/ui/toast";
-import CancelConfirmationDialog from "@/components/bookings/cancel-confirmation-dialog";
+import LessonCancellationDialog, { type CancellationInput } from "@/components/bookings/lesson-cancellation-dialog";
 import BookingConfirmationDialog from "@/components/bookings/booking-confirmation-dialog";
 import {
   formatTime,
@@ -99,10 +99,10 @@ export default function TutorTimeSlot({
     : "";
   const feedback = requestError || bookingError ||
     (conflict ? "You have a class at this time." : validationError);
-  async function submitRequest(action: "proposal" | "reject") {
+  async function submitRequest(action: "proposal" | "reject", cancellation?: CancellationInput) {
     if (submitting.current) return;
     setRequestError("");
-    let body: string | undefined;
+    let body: string | undefined = cancellation ? JSON.stringify(cancellation) : undefined;
     if (action === "proposal") {
       const selectionError = getScheduleFeedback(dateValue, startSelection, endSelection, new Date());
       if (selectionError || !dateValue || start === null || end === null) {
@@ -126,10 +126,10 @@ export default function TutorTimeSlot({
       if (action === "reject") setDeclineOpen(false);
       else setOfferOpen(false);
       toast.add({
-        title: action === "reject" ? "Request declined" : "Proposal sent",
+        title: action === "reject" ? "Request cancelled" : "Proposal sent",
         description:
           action === "reject"
-            ? "The lesson request has been declined."
+            ? "The lesson request has been cancelled."
             : "Lesson time proposed to student.",
         type: "success",
       });
@@ -323,14 +323,15 @@ export default function TutorTimeSlot({
           : undefined}
         error={feedback || undefined}
       />
-      <CancelConfirmationDialog
-        kind="request"
-        open={declineOpen}
+      {declineOpen && <LessonCancellationDialog
+        request
         onClose={() => setDeclineOpen(false)}
-        onConfirm={() => void submitRequest("reject")}
+        onConfirm={(input) => submitRequest("reject", input)}
+        schedule="Schedule not set"
+        error={requestError}
         busy={saving}
         targetName={interest.studentName}
-      />
+      />}
     </div>
   );
 }

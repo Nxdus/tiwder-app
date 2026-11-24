@@ -22,9 +22,8 @@ import TutorPhoto from "@/components/student/discover/tutor-photo";
 import SubjectSearch from "@/components/student/discover/subject-search";
 import { BookingListSkeleton } from "@/components/loading/skeletons";
 import BookingConfirmationDialog from "@/components/bookings/booking-confirmation-dialog";
-import CancelConfirmationDialog from "@/components/bookings/cancel-confirmation-dialog";
 import LessonCancellationDialog, { type CancellationInput } from "@/components/bookings/lesson-cancellation-dialog";
-import CancelledLessonCard from "@/components/bookings/cancelled-lesson-card";
+import CancelledLessonCard, { isCancelledBooking } from "@/components/bookings/cancelled-lesson-card";
 import DeletedAccountCard from "@/components/bookings/deleted-account-card";
 import {
   api,
@@ -59,8 +58,8 @@ const labels: Record<string, string> = {
   "awaiting-confirmation": "Awaiting Confirmation",
   completed: "Completed",
   cancelled: "Cancelled",
-  rejected: "Declined",
-  withdrawn: "Withdrawn",
+  rejected: "Cancelled",
+  withdrawn: "Cancelled",
   closed: "Closed",
   expired: "Expired",
 };
@@ -295,8 +294,8 @@ function BookingListContent({
             ? "Lesson confirmed successfully."
             : name === "cancel"
               ? "Lesson cancelled successfully."
-              : name === "reject"
-                ? "Lesson declined successfully."
+              : name === "reject" || name === "withdraw"
+                ? "Request cancelled successfully."
                 : name === "complete"
                   ? "Lesson marked as completed."
                   : "Lesson updated successfully.",
@@ -382,11 +381,12 @@ function BookingListContent({
   const showStatusFilter = kind === "matches";
   const isFiltered = showStatusFilter && statusFilter !== "all";
   const listedItems = kind === "interests"
-    ? items.filter((item) => item.status === "pending" || item.status === "proposed")
+    ? items.filter((item) => item.status === "pending" || item.status === "proposed" || isCancelledBooking(item))
     : items;
   if (kind === "interests" && role === "tutor") {
     listedItems.sort((first, second) =>
-      Number(first.status === "proposed") - Number(second.status === "proposed"),
+      (first.status === "pending" ? 0 : first.status === "proposed" ? 1 : 2) -
+      (second.status === "pending" ? 0 : second.status === "proposed" ? 1 : 2),
     );
   }
   const offeredSubjectIds = new Set(listedItems.map((item) => item.subjectId));
@@ -408,7 +408,7 @@ function BookingListContent({
   );
   const selected =
     visible.find((item) => item.id === selectedId) ??
-    (selectedId === null && kind === "matches" && visible.length === 1 && !deletedAccounts.length
+    (selectedId === null && role === "student" && kind === "matches" && visible.length === 1 && !isCancelledBooking(visible[0]) && !deletedAccounts.length
       ? visible[0]
       : null);
   const noMatchesForStatus = isFiltered && items.length > 0;
@@ -512,17 +512,17 @@ function BookingListContent({
             </Button>
           )}
         </Empty>
-      ) : role === "student" && selected?.status === "cancelled" && "cancellationReason" in selected ? (
+      ) : selected && isCancelledBooking(selected) ? (
         <div className="mx-auto w-full max-w-[330px] space-y-4">
-          {visible.length > 1 && <Button variant="ghost" onClick={() => setSelectedId("")}>Back to matches</Button>}
-          <CancelledLessonCard lesson={selected} name={selected.tutorName} />
+          <Button variant="ghost" onClick={() => setSelectedId("")}>Back to {kind === "matches" ? "matched" : role === "tutor" ? "swiped" : "offered"}</Button>
+          <CancelledLessonCard lesson={selected} tutorView={role === "tutor"} detail />
         </div>
       ) : role === "tutor" ? (
         <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,330px),330px))] justify-center gap-x-10 gap-y-[50px]">
           {visible.map((item) => {
             const p = proposalOf(item);
-            if (item.status === "cancelled" && "cancellationReason" in item) {
-              return <li key={item.id}><CancelledLessonCard lesson={item} name={item.studentName} /></li>;
+            if (isCancelledBooking(item)) {
+              return <li key={item.id} className="h-full"><CancelledLessonCard lesson={item} tutorView onOpen={() => setSelectedId(item.id)} /></li>;
             }
             return (
               <li key={item.id} className="h-full">
@@ -584,7 +584,7 @@ function BookingListContent({
             onPass={() => {}}
             onMatch={() => {}}
             onAccept={() => setConfirmation("accept")}
-            onReject={() => setConfirmation("reject")}
+            onReject={() => { setError(""); setLessonToCancel(selected); }}
             appointment={proposalOf(selected)}
             contact={"contact" in selected && lessonStatus(selected) !== "awaiting-confirmation" ? selected.contact : null}
             statusLabel={status(selected)}
@@ -678,8 +678,8 @@ function BookingListContent({
         <ul className="mx-auto mt-8 grid max-w-[536px] grid-cols-[repeat(auto-fit,152px)] justify-center gap-x-6 gap-y-[50px] sm:gap-x-10">
           {visible.map((item) => {
             const p = proposalOf(item);
-            if (item.status === "cancelled" && "cancellationReason" in item) {
-              return <li key={item.id}><CancelledLessonCard lesson={item} name={item.tutorName} /></li>;
+            if (isCancelledBooking(item)) {
+              return <li key={item.id} className="h-full"><CancelledLessonCard lesson={item} onOpen={() => setSelectedId(item.id)} /></li>;
             }
             return (
               <li key={item.id} className="h-full">
@@ -753,21 +753,21 @@ function BookingListContent({
         busy={busy}
         error={error}
       />
-      <CancelConfirmationDialog
-        kind="withdraw"
-        open={requestToWithdraw !== null}
+      {requestToWithdraw && <LessonCancellationDialog
+        request
+        key={requestToWithdraw.id}
         onClose={() => {
           setRequestToWithdraw(null);
           setError("");
         }}
-        onConfirm={() => {
-          if (requestToWithdraw) void action(requestToWithdraw.id, "withdraw");
-        }}
+        onConfirm={(input) => action(requestToWithdraw.id, "withdraw", input)}
+        schedule={proposalOf(requestToWithdraw) ? formatSchedule(proposalOf(requestToWithdraw)!) : "Schedule not set"}
         busy={busy}
-        targetName={requestToWithdraw?.tutorName}
+        targetName={requestToWithdraw.tutorName}
         error={error}
-      />
+      />}
       {lessonToCancel && <LessonCancellationDialog
+        request={kind === "interests"}
         key={lessonToCancel.id}
         onClose={() => {
           if (!busy) {
@@ -775,8 +775,8 @@ function BookingListContent({
             setError("");
           }
         }}
-        onConfirm={(input) => action(lessonToCancel.id, "cancel", input)}
-        schedule={formatSchedule(proposalOf(lessonToCancel)!)}
+        onConfirm={(input) => action(lessonToCancel.id, kind === "matches" ? "cancel" : "reject", input)}
+        schedule={proposalOf(lessonToCancel) ? formatSchedule(proposalOf(lessonToCancel)!) : "Schedule not set"}
         error={error}
         busy={busy}
         targetName={

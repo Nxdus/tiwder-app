@@ -154,6 +154,7 @@ export const swipes = pgTable(
       scale: 2,
       mode: 'number',
     }).notNull(),
+    cancellationReason: text('cancellation_reason'),
     date: date(),
     start: integer(),
     end: integer(),

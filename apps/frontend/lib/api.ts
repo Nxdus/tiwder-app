@@ -62,6 +62,7 @@ export type TutorPreview = {
   bio: string;
 };
 export type Interest = {
+  cancellationReason: string | null;
   student: StudentPreview;
   tutor: TutorPreview;
   id: string;

@@ -325,6 +325,15 @@ export class BookingService {
           .update(swipes)
           .set({
             status: action === 'withdraw' ? 'withdrawn' : 'rejected',
+            cancellationReason:
+              body == null
+                ? null
+                : (() => {
+                    const reason = parse(cancellationSchema, body);
+                    return reason.reason === 'Other'
+                      ? reason.details!
+                      : reason.reason;
+                  })(),
             updatedAt: new Date(),
           })
           .where(where);

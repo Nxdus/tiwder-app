@@ -9,13 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 const reasons = ["Schedule conflict", "Personal reasons", "Health reasons", "Other"];
 export type CancellationInput = { reason: string; details?: string };
 
-export default function LessonCancellationDialog({ targetName, schedule, busy, error, onClose, onConfirm }: {
+export default function LessonCancellationDialog({ targetName, schedule, busy, error, onClose, onConfirm, request = false }: {
   targetName: string;
   schedule: string;
   busy: boolean;
   error: string;
   onClose: () => void;
   onConfirm: (input: CancellationInput) => Promise<void>;
+  request?: boolean;
 }) {
   const [reason, setReason] = useState<string | null>(null);
   const [details, setDetails] = useState("");
@@ -29,9 +30,9 @@ export default function LessonCancellationDialog({ targetName, schedule, busy, e
         <Dialog.Backdrop className="fixed inset-0 z-30 bg-foreground/35 backdrop-blur-sm" />
         <Dialog.Viewport className="fixed inset-0 z-40 flex items-center justify-center p-5">
           <Dialog.Popup className="w-full max-w-[410px] rounded-2xl bg-card px-5 pb-4 pt-8 text-card-foreground shadow-[0_4px_4px_#00000040] outline-none">
-            <Dialog.Title className="text-base font-semibold">{reviewing ? "Cancel this lesson?" : "Why are you cancelling?"}</Dialog.Title>
+            <Dialog.Title className="text-base font-semibold">{reviewing ? request ? "Cancel this request?" : "Cancel this lesson?" : "Why are you cancelling?"}</Dialog.Title>
             <Dialog.Description className="mt-2 text-sm text-muted-foreground">
-              {reviewing ? "Check the reason below before confirming. This action cannot be undone." : `Choose a reason for cancelling your lesson with ${targetName}.`}
+              {reviewing ? "Check the reason below before confirming. This action cannot be undone." : `Choose a reason for cancelling your ${request ? "request" : "lesson"} with ${targetName}.`}
             </Dialog.Description>
             {reviewing ? (
               <dl className="mt-5 space-y-3 text-sm">
