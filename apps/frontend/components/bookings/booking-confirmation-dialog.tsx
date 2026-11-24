@@ -9,16 +9,23 @@ export default function BookingConfirmationDialog({
   onConfirm,
   busy = false,
   tutorName,
+  studentName,
+  summary,
+  confirmDisabled = false,
   error,
 }: {
-  confirmation: "accept" | "reject" | "complete" | null;
+  confirmation: "accept" | "reject" | "complete" | "proposal" | null;
   onClose: () => void;
   onConfirm: () => void;
   busy?: boolean;
   tutorName?: string;
+  studentName?: string;
+  summary?: string;
+  confirmDisabled?: boolean;
   error?: string;
 }) {
   const completing = confirmation === "complete";
+  const proposing = confirmation === "proposal";
   return (
     <Dialog.Root
       open={confirmation !== null}
@@ -31,19 +38,24 @@ export default function BookingConfirmationDialog({
         <Dialog.Viewport className="fixed inset-0 z-40 flex items-center justify-center p-5">
           <Dialog.Popup className="w-full max-w-[410px] rounded-2xl bg-card text-card-foreground px-5 pb-4 pt-8 shadow-[0_4px_4px_#00000040] outline-none">
             <Dialog.Title className="text-base font-semibold">
-              {completing
+              {proposing
+                ? "Send this time offer?"
+                : completing
                 ? "Did you attend this lesson?"
                 : confirmation === "reject"
                 ? "Decline this match?"
                 : "Accept this match?"}
             </Dialog.Title>
             <Dialog.Description className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              {completing
+              {proposing
+                ? `Send this lesson time to ${studentName}? The student will need to accept your offer.`
+                : completing
                 ? `Confirm your attendance for the lesson with ${tutorName}.`
                 : confirmation === "reject"
                 ? "Are you sure you want to decline this offer from your tutor? This offer will be removed."
                 : "Are you sure you want to confirm this match with your tutor? Your tutoring session will be confirmed."}
             </Dialog.Description>
+            {summary && <p className="mt-4 text-sm font-medium">{summary}</p>}
             {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
             <div className="mt-10 flex justify-end gap-3">
               <Dialog.Close
@@ -55,9 +67,11 @@ export default function BookingConfirmationDialog({
               <Button
                 variant={confirmation === "reject" ? "destructive" : "default"}
                 onClick={onConfirm}
-                disabled={busy}
+                disabled={busy || confirmDisabled}
               >
-                {completing
+                {proposing
+                  ? busy ? "Sending…" : "Send Offer"
+                  : completing
                   ? "Yes, I attended"
                   : confirmation === "reject" ? "Decline Match" : "Confirm Match"}
               </Button>
