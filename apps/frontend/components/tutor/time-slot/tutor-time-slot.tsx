@@ -264,7 +264,7 @@ export default function TutorTimeSlot({
                 <Button
                   variant="destructive"
                   size="lg"
-                  className="flex-1"
+                  className="flex-1 bg-destructive text-white hover:bg-destructive/90 dark:bg-destructive dark:hover:bg-destructive/90"
                   disabled={saving}
                   onClick={() => setDeclineOpen(true)}
                 >
