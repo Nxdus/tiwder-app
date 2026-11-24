@@ -48,7 +48,11 @@ export default function BookingConfirmationDialog({
             </Dialog.Title>
             <Dialog.Description className="mt-2 text-sm leading-relaxed text-muted-foreground">
               {proposing
-                ? `Send this lesson time to ${studentName}? The student will need to accept your offer.`
+                ? <>
+                    {`Send this lesson time to ${studentName}?`}
+                    <br />
+                    The student will need to accept your offer.
+                  </>
                 : completing
                 ? `Confirm your attendance for the lesson with ${tutorName}.`
                 : confirmation === "reject"
