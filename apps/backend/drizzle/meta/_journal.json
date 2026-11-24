@@ -57,6 +57,27 @@
       "when": 1795193717684,
       "tag": "0007_deleted_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795510887440,
+      "tag": "0008_lesson_cancellation_reason",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795537090197,
+      "tag": "0009_request_cancellation_reason",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795539962219,
+      "tag": "0010_remove_cancelled_requests",
+      "breakpoints": true
     }
   ]
 }

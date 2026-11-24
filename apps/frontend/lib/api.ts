@@ -62,6 +62,8 @@ export type TutorPreview = {
   bio: string;
 };
 export type Interest = {
+  updatedAt: string;
+  cancellationReason: string | null;
   student: StudentPreview;
   tutor: TutorPreview;
   id: string;
@@ -77,6 +79,8 @@ export type Interest = {
   proposal: Proposal | null;
 };
 export type Match = Proposal & {
+  updatedAt: string;
+  cancellationReason: string | null;
   student: StudentPreview;
   tutor: TutorPreview;
   id: string;

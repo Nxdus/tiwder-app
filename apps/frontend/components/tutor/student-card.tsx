@@ -12,6 +12,7 @@ import PhotoIndicators from "@/components/ui/photo-indicators";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { Student } from "@/lib/tutor/students";
+import CancellationReason from "@/components/bookings/cancellation-reason";
 
 export default function StudentCard({
   student,
@@ -21,6 +22,9 @@ export default function StudentCard({
   href,
   actions,
   className,
+  cancelledReason,
+  cancellationDetails,
+  onOpen,
 }: {
   student: Student;
   selectable?: boolean;
@@ -29,6 +33,9 @@ export default function StudentCard({
   href?: string;
   actions?: ReactNode;
   className?: string;
+  cancelledReason?: string | null;
+  cancellationDetails?: ReactNode;
+  onOpen?: () => void;
 }) {
   const photos = student.photos?.length
     ? student.photos
@@ -85,11 +92,14 @@ export default function StudentCard({
     <Card
       className={cn(
         "relative isolate flex h-full flex-col w-full gap-0 border-0 bg-card py-0 shadow-lg ring-0",
-        selectable &&
+        (selectable || onOpen) &&
           "cursor-pointer transition-[translate,scale,box-shadow] duration-200 ease-out hover:z-30 hover:shadow-[0_20px_45px_rgb(0_0_0/0.2)] focus-within:z-30 focus-within:shadow-[0_20px_45px_rgb(0_0_0/0.2)] active:shadow-md motion-safe:hover:-translate-y-3 motion-safe:hover:scale-[1.05] motion-safe:focus-within:-translate-y-3 motion-safe:focus-within:scale-[1.05] motion-reduce:transition-none",
         className,
+        cancelledReason !== undefined && "min-h-[587px]",
+        onOpen && "cursor-pointer",
       )}
     >
+      {onOpen && <button type="button" onClick={onOpen} aria-label={`View cancelled lesson with ${student.name}`} className="absolute inset-0 z-10 cursor-pointer rounded-[inherit] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary" />}
       {selectable && (
         <Link
           href={href ?? `/tutor/time-slot?student=${student.id}`}
@@ -103,6 +113,7 @@ export default function StudentCard({
             role="group"
             aria-label={`${student.name}'s photos`}
             className="absolute inset-0 z-20"
+            onClick={onOpen}
             onKeyDown={(event) => {
               if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
                 event.preventDefault();
@@ -165,7 +176,27 @@ export default function StudentCard({
           </span>
         )}
       </div>
-      <CardContent className="flex flex-1 flex-col gap-4 p-4">
+      {cancelledReason !== undefined ? (
+        <CardContent className="flex flex-1 flex-col gap-4 p-4">
+          {status}
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <h2 className="text-xl font-semibold">{student.name}</h2>
+            {student.grade && <Badge variant="secondary">{student.grade}</Badge>}
+          </div>
+          {cancellationDetails}
+          <CancellationReason reason={cancelledReason} />
+          <div className="mt-1 flex flex-col gap-4">
+            <Separator />
+            <section aria-label={`Subject chosen by ${student.name}`} className="flex flex-col gap-2">
+              <h3 className="text-base font-semibold">Subject chose</h3>
+              <div className="flex flex-col items-start gap-2">
+                <Badge className="border-primary/20 bg-primary/20 px-2.5 py-1 text-xs text-primary-foreground">{student.subject}</Badge>
+                <p className="flex items-center gap-2 text-xs text-muted-foreground"><Gauge aria-hidden="true" className="size-4 shrink-0" />{student.level}</p>
+              </div>
+            </section>
+          </div>
+        </CardContent>
+      ) : <CardContent className="flex flex-1 flex-col gap-4 p-4">
         <div className="flex flex-col items-start gap-3">
           {status && <div>{status}</div>}
           <div className="flex w-full items-start justify-between gap-2">
@@ -263,7 +294,7 @@ export default function StudentCard({
             <div className="relative z-20 flex flex-wrap gap-2">{actions}</div>
           )}
         </div>
-      </CardContent>
+      </CardContent>}
     </Card>
   );
 }

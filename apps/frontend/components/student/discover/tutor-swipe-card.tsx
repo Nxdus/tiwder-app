@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowLeft,
   BadgeDollarSign,
   BanknoteArrowUp,
   Check,
@@ -25,6 +24,7 @@ import { formatSchedule, type Proposal } from "@/lib/api";
 import { formatCompactName } from "@/lib/utils";
 import TutorPhoto from "./tutor-photo";
 import PhotoIndicators from "@/components/ui/photo-indicators";
+import BookingBackButton from "@/components/bookings/booking-back-button";
 
 export default function TutorSwipeCard({
   tutor,
@@ -171,17 +171,7 @@ export default function TutorSwipeCard({
     >
       {details && showBack && (
         <div className="mb-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              onBack();
-            }}
-            className="h-auto justify-start gap-2 px-0 text-sm font-normal text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
-          >
-            <ArrowLeft className="size-4" />
-            Back to {tab === "Discover" ? "discover" : tab === "Matched" ? "matched" : "offered"}
-          </Button>
+          <BookingBackButton destination={tab === "Discover" ? "discover" : tab === "Matched" ? "matched" : "offered"} onBack={onBack} />
         </div>
       )}
       <div className="[perspective:1400px]">

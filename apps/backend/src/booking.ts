@@ -76,6 +76,20 @@ export const proposalSchema = z
   .object({ date: z.iso.date(), start: minute, end: minute })
   .strict()
   .refine((p) => p.start < p.end, 'Start must precede end');
+const cancellationSchema = z
+  .object({
+    reason: z.enum([
+      'Schedule conflict',
+      'Personal reasons',
+      'Health reasons',
+      'Other',
+    ]),
+    details: z.string().trim().max(300).optional(),
+  })
+  .strict()
+  .refine((value) => value.reason !== 'Other' || Boolean(value.details), {
+    message: 'Please describe your reason for cancelling',
+  });
 function slotTime(date: string, minute: number) {
   return new Date(Date.parse(date + 'T00:00:00+07:00') + minute * 60000);
 }
@@ -199,9 +213,17 @@ export class BookingService {
         .select()
         .from(swipes)
         .where(
-          eq(
-            user.role === 'student' ? swipes.studentId : swipes.tutorId,
-            user.id,
+          and(
+            eq(
+              user.role === 'student' ? swipes.studentId : swipes.tutorId,
+              user.id,
+            ),
+            eq(
+              user.role === 'student'
+                ? swipes.studentRemoved
+                : swipes.tutorRemoved,
+              false,
+            ),
           ),
         );
       return withProfiles(
@@ -215,7 +237,9 @@ export class BookingService {
   }
   async change(user: Identity, id: string, action: string, body: unknown) {
     parse(z.uuid(), id);
-    if (!['withdraw', 'reject', 'proposal', 'confirm'].includes(action))
+    if (
+      !['withdraw', 'reject', 'proposal', 'confirm', 'remove'].includes(action)
+    )
       throw new NotFoundException();
     return this.transaction(async (tx) => {
       const own = eq(
@@ -228,6 +252,19 @@ export class BookingService {
       await lockPair(tx, initial.studentId, initial.tutorId);
       const [row] = await tx.select().from(swipes).where(where).for('update');
       if (!row) throw new NotFoundException();
+      if (action === 'remove') {
+        if (row.status !== 'rejected' && row.status !== 'withdrawn')
+          throw new ConflictException('Only cancelled requests can be removed');
+        await tx
+          .update(swipes)
+          .set(
+            user.role === 'student'
+              ? { studentRemoved: true }
+              : { tutorRemoved: true },
+          )
+          .where(where);
+        return { id };
+      }
       if (row.status !== 'pending' && row.status !== 'proposed')
         throw new ConflictException('Interest already closed');
       if (
@@ -311,6 +348,15 @@ export class BookingService {
           .update(swipes)
           .set({
             status: action === 'withdraw' ? 'withdrawn' : 'rejected',
+            cancellationReason:
+              body == null
+                ? null
+                : (() => {
+                    const reason = parse(cancellationSchema, body);
+                    return reason.reason === 'Other'
+                      ? reason.details!
+                      : reason.reason;
+                  })(),
             updatedAt: new Date(),
           })
           .where(where);
@@ -324,6 +370,7 @@ export class BookingService {
         .select({
           id: matches.id,
           status: matches.status,
+          cancellationReason: matches.cancellationReason,
           studentId: swipes.studentId,
           studentName: swipes.studentName,
           tutorId: swipes.tutorId,
@@ -378,7 +425,8 @@ export class BookingService {
         tx,
         rows.map(({ email, phone, ended, ...row }) => ({
           ...row,
-          contact: row.status === 'confirmed' && !ended ? { email, phone } : null,
+          contact:
+            row.status === 'confirmed' && !ended ? { email, phone } : null,
         })),
       );
     });
@@ -412,8 +460,15 @@ export class BookingService {
       throw new ConflictException('Lesson can only be confirmed after it ends');
     });
   }
-  async cancel(user: Identity, id: string) {
+  async cancel(user: Identity, id: string, body?: unknown) {
     parse(z.uuid(), id);
+    // Keep cancellation compatible with clients released before reasons were added.
+    const reason = body == null ? null : parse(cancellationSchema, body);
+    const cancellationReason = reason
+      ? reason.reason === 'Other'
+        ? reason.details!
+        : reason.reason
+      : null;
     return this.transaction(async (tx) => {
       const [row] = await tx
         .select({
@@ -437,7 +492,7 @@ export class BookingService {
       await lockPair(tx, row.student, row.tutor);
       const updated = await tx
         .update(matches)
-        .set({ status: 'cancelled', updatedAt: new Date() })
+        .set({ status: 'cancelled', cancellationReason, updatedAt: new Date() })
         .where(
           and(
             eq(matches.id, id),
@@ -485,8 +540,9 @@ export class BookingController {
   @Post('matches/:id/cancel') async cancel(
     @Req() req: Request,
     @Param('id') id: string,
+    @Body() body: unknown,
   ) {
-    return this.booking.cancel(await this.auth.require(req), id);
+    return this.booking.cancel(await this.auth.require(req), id, body);
   }
   @Post('matches/:id/complete') async complete(
     @Req() req: Request,

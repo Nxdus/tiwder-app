@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  CalendarDays,
   CircleAlert,
   CircleCheck,
   CircleMinus,
@@ -13,23 +12,25 @@ import {
   CalendarX2,
   RotateCcw,
   Undo2,
+  Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
 import StudentCard from "@/components/tutor/student-card";
 import TutorSwipeCard from "@/components/student/discover/tutor-swipe-card";
-import TutorPhoto from "@/components/student/discover/tutor-photo";
 import SubjectSearch from "@/components/student/discover/subject-search";
 import { BookingListSkeleton } from "@/components/loading/skeletons";
 import BookingConfirmationDialog from "@/components/bookings/booking-confirmation-dialog";
+import LessonCancellationDialog, { type CancellationInput } from "@/components/bookings/lesson-cancellation-dialog";
+import BookingPreviewCard from "@/components/bookings/booking-preview-card";
+import BookingBackButton from "@/components/bookings/booking-back-button";
 import CancelConfirmationDialog from "@/components/bookings/cancel-confirmation-dialog";
+import CancelledLessonCard, { isCancelledBooking } from "@/components/bookings/cancelled-lesson-card";
 import DeletedAccountCard from "@/components/bookings/deleted-account-card";
 import {
   api,
   ApiError,
-  formatMinutes,
   formatSchedule,
-  formatScheduleDate,
   type Interest,
   type Match,
   type Proposal,
@@ -46,7 +47,8 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from "@/components/ui/empty";
-import { cn, formatCompactName } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { isVisibleRequest } from "@/lib/booking-visibility";
 
 type Lesson = Interest | Match;
 const labels: Record<string, string> = {
@@ -57,8 +59,8 @@ const labels: Record<string, string> = {
   "awaiting-confirmation": "Awaiting Confirmation",
   completed: "Completed",
   cancelled: "Cancelled",
-  rejected: "Declined",
-  withdrawn: "Withdrawn",
+  rejected: "Cancelled",
+  withdrawn: "Cancelled",
   closed: "Closed",
   expired: "Expired",
 };
@@ -203,6 +205,8 @@ function BookingListContent({
   const [completionId, setCompletionId] = useState<string | null>(null);
   const [dismissedCompletionIds, setDismissedCompletionIds] = useState<string[]>([]);
   const [requestToWithdraw, setRequestToWithdraw] = useState<Lesson | null>(null);
+  const [requestToRemove, setRequestToRemove] = useState<Lesson | null>(null);
+  const actionPending = useRef(false);
   const role = session.user?.role;
   const hasData = useRef(false);
   const load = useCallback(async () => {
@@ -265,14 +269,15 @@ function BookingListContent({
       setBusy(false);
     }
   }
-  async function action(id: string, name: string) {
-    if (busy) return;
+  async function action(id: string, name: string, cancellation?: CancellationInput) {
+    if (busy || actionPending.current) return;
+    actionPending.current = true;
     setBusy(true);
     setError("");
     try {
       await api(
         `/${kind}/${id}/${name}`,
-        { method: "POST" },
+        { method: "POST", ...(cancellation ? { body: JSON.stringify(cancellation) } : {}) },
         session.csrfToken,
       );
       if (name === "complete") {
@@ -281,20 +286,27 @@ function BookingListContent({
         ));
         setCompletionId(null);
       }
+      if (name === "remove") {
+        setItems((current) => current.filter((item) => item.id !== id));
+        setSelectedId("");
+        setRequestToRemove(null);
+      }
       await load();
       setConfirmation(null);
       setLessonToCancel(null);
       setRequestToWithdraw(null);
       if (name === "confirm") onConfirmed?.();
       toast.add({
-        title: "Success",
+        title: name === "remove" ? "Request removed" : "Success",
         description:
-          name === "confirm"
+          name === "remove"
+            ? "Removed from your list."
+            : name === "confirm"
             ? "Lesson confirmed successfully."
             : name === "cancel"
               ? "Lesson cancelled successfully."
-              : name === "reject"
-                ? "Lesson declined successfully."
+              : name === "reject" || name === "withdraw"
+                ? "Request cancelled successfully."
                 : name === "complete"
                   ? "Lesson marked as completed."
                   : "Lesson updated successfully.",
@@ -305,13 +317,14 @@ function BookingListContent({
         cause instanceof Error ? cause.message : "Unable to update lesson.";
       setError(message);
       toast.add({
-        title: "Unable to update lesson",
+        title: name === "remove" ? "Unable to remove request" : "Unable to update lesson",
         description: message,
         type: "error",
       });
       if (cause instanceof ApiError && cause.status === 401)
         void refreshSession().catch(() => {});
     } finally {
+      actionPending.current = false;
       setBusy(false);
     }
   }
@@ -380,11 +393,17 @@ function BookingListContent({
   const showStatusFilter = kind === "matches";
   const isFiltered = showStatusFilter && statusFilter !== "all";
   const listedItems = kind === "interests"
-    ? items.filter((item) => item.status === "pending" || item.status === "proposed")
+    ? items.filter((item) => "proposal" in item && isVisibleRequest(item, role))
     : items;
   if (kind === "interests" && role === "tutor") {
     listedItems.sort((first, second) =>
-      Number(first.status === "proposed") - Number(second.status === "proposed"),
+      (first.status === "pending" ? 0 : first.status === "proposed" ? 1 : 2) -
+      (second.status === "pending" ? 0 : second.status === "proposed" ? 1 : 2),
+    );
+  } else if (kind === "interests" && role === "student") {
+    listedItems.sort((first, second) =>
+      (first.status === "proposed" ? 0 : first.status === "pending" ? 1 : 2) -
+      (second.status === "proposed" ? 0 : second.status === "pending" ? 1 : 2),
     );
   }
   const offeredSubjectIds = new Set(listedItems.map((item) => item.subjectId));
@@ -406,7 +425,7 @@ function BookingListContent({
   );
   const selected =
     visible.find((item) => item.id === selectedId) ??
-    (selectedId === null && kind === "matches" && visible.length === 1 && !deletedAccounts.length
+    (selectedId === null && role === "student" && kind === "matches" && visible.length === 1 && !isCancelledBooking(visible[0]) && !deletedAccounts.length
       ? visible[0]
       : null);
   const noMatchesForStatus = isFiltered && items.length > 0;
@@ -510,10 +529,24 @@ function BookingListContent({
             </Button>
           )}
         </Empty>
+      ) : selected && isCancelledBooking(selected) ? (
+        <div className="mx-auto mt-8 w-full max-w-[330px]">
+          <div className="mb-4"><BookingBackButton destination={kind === "matches" ? "matched" : role === "tutor" ? "swiped" : "offered"} onBack={() => setSelectedId("")} /></div>
+          <CancelledLessonCard lesson={selected} tutorView={role === "tutor"} detail />
+          {kind === "interests" && <Button
+            variant="outline"
+            className="mt-4 h-11 w-full gap-2 rounded-2xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            disabled={busy}
+            onClick={() => { setError(""); setRequestToRemove(selected); }}
+          ><Trash2 aria-hidden="true" className="size-4" />Remove from list</Button>}
+        </div>
       ) : role === "tutor" ? (
         <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,330px),330px))] justify-center gap-x-10 gap-y-[50px]">
           {visible.map((item) => {
             const p = proposalOf(item);
+            if (isCancelledBooking(item)) {
+              return <li key={item.id} className="h-full"><CancelledLessonCard lesson={item} tutorView onOpen={() => setSelectedId(item.id)} /></li>;
+            }
             return (
               <li key={item.id} className="h-full">
                 <StudentCard
@@ -535,14 +568,16 @@ function BookingListContent({
                     ) : undefined
                   }
                   actions={
-                    kind === "matches" &&
+                    item.status === "cancelled" && "cancellationReason" in item ? (
+                      <p className="text-sm break-words whitespace-pre-wrap"><span className="text-muted-foreground">Cancellation reason: </span>{item.cancellationReason || "No reason provided"}</p>
+                    ) : kind === "matches" &&
                       item.status === "confirmed" &&
                       future(item) ? (
                       <Button
                         size="sm"
                         variant="outline"
                         disabled={busy}
-                        onClick={() => setLessonToCancel(item)}
+                        onClick={() => { setError(""); setLessonToCancel(item); }}
                       >
                         Cancel lesson
                       </Button>
@@ -572,7 +607,7 @@ function BookingListContent({
             onPass={() => {}}
             onMatch={() => {}}
             onAccept={() => setConfirmation("accept")}
-            onReject={() => setConfirmation("reject")}
+            onReject={() => { setError(""); setLessonToCancel(selected); }}
             appointment={proposalOf(selected)}
             contact={"contact" in selected && lessonStatus(selected) !== "awaiting-confirmation" ? selected.contact : null}
             statusLabel={status(selected)}
@@ -584,6 +619,9 @@ function BookingListContent({
             showBack={kind === "interests" || visible.length + deletedAccounts.length > 1}
           />
           <div className="mx-auto mt-4 w-full max-w-[330px]">
+            {selected.status === "cancelled" && "cancellationReason" in selected && (
+              <p className="mb-4 text-sm break-words whitespace-pre-wrap"><span className="text-muted-foreground">Cancellation reason: </span>{selected.cancellationReason || "No reason provided"}</p>
+            )}
             {kind === "interests" && selected.status === "pending" && (
               <Button
                 variant="outline"
@@ -604,7 +642,7 @@ function BookingListContent({
                 <Button
                   variant="outline"
                   disabled={busy}
-                  onClick={() => setLessonToCancel(selected)}
+                  onClick={() => { setError(""); setLessonToCancel(selected); }}
                   className="h-11 w-full gap-2 rounded-2xl border-destructive/30 text-sm font-medium text-destructive transition-all hover:bg-destructive/10 hover:text-destructive"
                 >
                   <CalendarX2 className="size-4" />
@@ -663,52 +701,20 @@ function BookingListContent({
         <ul className="mx-auto mt-8 grid max-w-[536px] grid-cols-[repeat(auto-fit,152px)] justify-center gap-x-6 gap-y-[50px] sm:gap-x-10">
           {visible.map((item) => {
             const p = proposalOf(item);
+            if (isCancelledBooking(item)) {
+              return <li key={item.id} className="h-full"><CancelledLessonCard lesson={item} onOpen={() => setSelectedId(item.id)} emphasizeHover={kind === "interests"} /></li>;
+            }
             return (
               <li key={item.id} className="h-full">
-                <button
-                  type="button"
-                  aria-label={`${item.tutorName}, ${status(item)}${p ? `, ${formatScheduleDate(p.date)}, ${formatMinutes(p.start)}–${formatMinutes(p.end)}` : ", Schedule not set"}`}
-                  onClick={() => setSelectedId(item.id)}
-                  className={cn(
-                    "group relative block h-[270px] w-[152px] cursor-pointer overflow-hidden rounded-2xl bg-secondary text-left text-foreground ring-1 ring-border transition-[translate,scale,box-shadow] duration-200 ease-out hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none",
-                    kind === "interests" && "hover:z-30 hover:shadow-[0_20px_45px_rgb(0_0_0/0.2)] focus-visible:z-30 focus-visible:shadow-[0_20px_45px_rgb(0_0_0/0.2)] motion-safe:hover:-translate-y-3 motion-safe:hover:scale-[1.05] motion-safe:focus-visible:-translate-y-3 motion-safe:focus-visible:scale-[1.05]",
-                  )}
-                >
-                  <TutorPhoto tutor={tutorOf(item)} />
-                  <div
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent opacity-0 group-has-[img[data-loaded=true]]:opacity-50"
-                  />
-                  <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3 group-has-[img[data-loaded=true]]:text-white group-has-[img[data-loaded=true]]:[text-shadow:0_1px_3px_rgb(0_0_0/0.85)]">
-                    <p
-                      title={item.tutorName}
-                      className="truncate text-sm font-semibold leading-5"
-                    >
-                      {formatCompactName(item.tutorName)}
-                    </p>
-                    <div className="flex flex-col gap-1 text-xs leading-4 text-foreground/80 group-has-[img[data-loaded=true]]:text-white">
-                      <p className="flex items-start gap-1.5">
-                        <CalendarDays aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
-                        <span>{p ? formatScheduleDate(p.date) : "Schedule not set"}</span>
-                      </p>
-                      {p && (
-                        <p className="flex items-start gap-1.5">
-                          <Clock aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
-                          <span className="tabular-nums">
-                            {formatMinutes(p.start)}–{formatMinutes(p.end)}
-                          </span>
-                        </p>
-                      )}
-                    </div>
-                    <Badge
-                      variant={statusVariants[lessonStatus(item)] ?? "secondary"}
-                      className="h-auto max-w-full gap-1 whitespace-normal py-1 text-[11px] leading-4 [text-shadow:none]"
-                    >
-                      <StatusIcon status={lessonStatus(item)} />
-                      <span>{status(item)}</span>
-                    </Badge>
-                  </div>
-                </button>
+                <BookingPreviewCard
+                  tutor={tutorOf(item)}
+                  appointment={p}
+                  statusLabel={status(item)}
+                  statusVariant={statusVariants[lessonStatus(item)] ?? "secondary"}
+                  statusIcon={<StatusIcon status={lessonStatus(item)} />}
+                  onOpen={() => setSelectedId(item.id)}
+                  emphasizeHover={kind === "interests"}
+                />
               </li>
             );
           })}
@@ -736,39 +742,47 @@ function BookingListContent({
         error={error}
       />
       <CancelConfirmationDialog
-        kind="withdraw"
-        open={requestToWithdraw !== null}
+        kind="remove"
+        open={requestToRemove !== null}
+        onClose={() => { setRequestToRemove(null); setError(""); }}
+        onConfirm={() => { if (requestToRemove && kind === "interests") void action(requestToRemove.id, "remove"); }}
+        busy={busy}
+        error={error}
+      />
+      {requestToWithdraw && <LessonCancellationDialog
+        request
+        key={requestToWithdraw.id}
         onClose={() => {
           setRequestToWithdraw(null);
           setError("");
         }}
-        onConfirm={() => {
-          if (requestToWithdraw) void action(requestToWithdraw.id, "withdraw");
-        }}
+        onConfirm={(input) => action(requestToWithdraw.id, "withdraw", input)}
+        schedule={proposalOf(requestToWithdraw) ? formatSchedule(proposalOf(requestToWithdraw)!) : "Schedule not set"}
         busy={busy}
-        targetName={requestToWithdraw?.tutorName}
+        targetName={requestToWithdraw.tutorName}
         error={error}
-      />
-      <CancelConfirmationDialog
-        open={lessonToCancel !== null}
+      />}
+      {lessonToCancel && <LessonCancellationDialog
+        request={kind === "interests"}
+        key={lessonToCancel.id}
         onClose={() => {
           if (!busy) {
             setLessonToCancel(null);
             setError("");
           }
         }}
-        onConfirm={() => {
-          if (lessonToCancel) void action(lessonToCancel.id, "cancel");
-        }}
+        onConfirm={(input) => action(lessonToCancel.id, kind === "matches" ? "cancel" : "reject", input)}
+        schedule={proposalOf(lessonToCancel) ? formatSchedule(proposalOf(lessonToCancel)!) : "Schedule not set"}
+        error={error}
         busy={busy}
         targetName={
           lessonToCancel
             ? role === "tutor"
               ? lessonToCancel.studentName
               : lessonToCancel.tutorName
-            : undefined
+            : ""
         }
-      />
+      />}
     </section>
   );
 }

@@ -47,7 +47,10 @@ export const users = pgTable('users', {
   email: text().notNull(),
   name: text().notNull(),
   avatarUrl: text('avatar_url'),
-  photos: text('photos').array().notNull().default(sql`'{}'::text[]`),
+  photos: text('photos')
+    .array()
+    .notNull()
+    .default(sql`'{}'::text[]`),
   role: role(),
   onboarded: boolean().notNull().default(false),
 });
@@ -151,6 +154,9 @@ export const swipes = pgTable(
       scale: 2,
       mode: 'number',
     }).notNull(),
+    cancellationReason: text('cancellation_reason'),
+    studentRemoved: boolean('student_removed').notNull().default(false),
+    tutorRemoved: boolean('tutor_removed').notNull().default(false),
     date: date(),
     start: integer(),
     end: integer(),
@@ -188,6 +194,7 @@ export const matches = pgTable(
       .notNull()
       .references(() => timeSlots.id),
     status: matchStatus().notNull().default('confirmed'),
+    cancellationReason: text('cancellation_reason'),
     matchedAt: timestamp('matched_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

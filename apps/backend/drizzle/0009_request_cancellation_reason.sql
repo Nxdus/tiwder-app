@@ -1,0 +1,1 @@
+ALTER TABLE "swipes" ADD COLUMN "cancellation_reason" text;
