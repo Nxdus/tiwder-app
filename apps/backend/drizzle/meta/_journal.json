@@ -71,6 +71,13 @@
       "when": 1795537090197,
       "tag": "0009_request_cancellation_reason",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795539962219,
+      "tag": "0010_remove_cancelled_requests",
+      "breakpoints": true
     }
   ]
 }

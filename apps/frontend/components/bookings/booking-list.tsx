@@ -12,6 +12,7 @@ import {
   CalendarX2,
   RotateCcw,
   Undo2,
+  Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ComponentProps } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -23,6 +24,7 @@ import BookingConfirmationDialog from "@/components/bookings/booking-confirmatio
 import LessonCancellationDialog, { type CancellationInput } from "@/components/bookings/lesson-cancellation-dialog";
 import BookingPreviewCard from "@/components/bookings/booking-preview-card";
 import BookingBackButton from "@/components/bookings/booking-back-button";
+import CancelConfirmationDialog from "@/components/bookings/cancel-confirmation-dialog";
 import CancelledLessonCard, { isCancelledBooking } from "@/components/bookings/cancelled-lesson-card";
 import DeletedAccountCard from "@/components/bookings/deleted-account-card";
 import {
@@ -203,6 +205,8 @@ function BookingListContent({
   const [completionId, setCompletionId] = useState<string | null>(null);
   const [dismissedCompletionIds, setDismissedCompletionIds] = useState<string[]>([]);
   const [requestToWithdraw, setRequestToWithdraw] = useState<Lesson | null>(null);
+  const [requestToRemove, setRequestToRemove] = useState<Lesson | null>(null);
+  const actionPending = useRef(false);
   const role = session.user?.role;
   const hasData = useRef(false);
   const load = useCallback(async () => {
@@ -266,7 +270,8 @@ function BookingListContent({
     }
   }
   async function action(id: string, name: string, cancellation?: CancellationInput) {
-    if (busy) return;
+    if (busy || actionPending.current) return;
+    actionPending.current = true;
     setBusy(true);
     setError("");
     try {
@@ -281,15 +286,22 @@ function BookingListContent({
         ));
         setCompletionId(null);
       }
+      if (name === "remove") {
+        setItems((current) => current.filter((item) => item.id !== id));
+        setSelectedId("");
+        setRequestToRemove(null);
+      }
       await load();
       setConfirmation(null);
       setLessonToCancel(null);
       setRequestToWithdraw(null);
       if (name === "confirm") onConfirmed?.();
       toast.add({
-        title: "Success",
+        title: name === "remove" ? "Request removed" : "Success",
         description:
-          name === "confirm"
+          name === "remove"
+            ? "Removed from your list."
+            : name === "confirm"
             ? "Lesson confirmed successfully."
             : name === "cancel"
               ? "Lesson cancelled successfully."
@@ -305,13 +317,14 @@ function BookingListContent({
         cause instanceof Error ? cause.message : "Unable to update lesson.";
       setError(message);
       toast.add({
-        title: "Unable to update lesson",
+        title: name === "remove" ? "Unable to remove request" : "Unable to update lesson",
         description: message,
         type: "error",
       });
       if (cause instanceof ApiError && cause.status === 401)
         void refreshSession().catch(() => {});
     } finally {
+      actionPending.current = false;
       setBusy(false);
     }
   }
@@ -515,6 +528,12 @@ function BookingListContent({
         <div className="mx-auto mt-8 w-full max-w-[330px]">
           <div className="mb-4"><BookingBackButton destination={kind === "matches" ? "matched" : role === "tutor" ? "swiped" : "offered"} onBack={() => setSelectedId("")} /></div>
           <CancelledLessonCard lesson={selected} tutorView={role === "tutor"} detail />
+          {kind === "interests" && <Button
+            variant="outline"
+            className="mt-4 h-11 w-full gap-2 rounded-2xl border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            disabled={busy}
+            onClick={() => { setError(""); setRequestToRemove(selected); }}
+          ><Trash2 aria-hidden="true" className="size-4" />Remove from list</Button>}
         </div>
       ) : role === "tutor" ? (
         <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,330px),330px))] justify-center gap-x-10 gap-y-[50px]">
@@ -714,6 +733,14 @@ function BookingListContent({
         onConfirm={() => {
           if (completionLesson) void action(completionLesson.id, "complete");
         }}
+        busy={busy}
+        error={error}
+      />
+      <CancelConfirmationDialog
+        kind="remove"
+        open={requestToRemove !== null}
+        onClose={() => { setRequestToRemove(null); setError(""); }}
+        onConfirm={() => { if (requestToRemove && kind === "interests") void action(requestToRemove.id, "remove"); }}
         busy={busy}
         error={error}
       />

@@ -213,9 +213,17 @@ export class BookingService {
         .select()
         .from(swipes)
         .where(
-          eq(
-            user.role === 'student' ? swipes.studentId : swipes.tutorId,
-            user.id,
+          and(
+            eq(
+              user.role === 'student' ? swipes.studentId : swipes.tutorId,
+              user.id,
+            ),
+            eq(
+              user.role === 'student'
+                ? swipes.studentRemoved
+                : swipes.tutorRemoved,
+              false,
+            ),
           ),
         );
       return withProfiles(
@@ -229,7 +237,9 @@ export class BookingService {
   }
   async change(user: Identity, id: string, action: string, body: unknown) {
     parse(z.uuid(), id);
-    if (!['withdraw', 'reject', 'proposal', 'confirm'].includes(action))
+    if (
+      !['withdraw', 'reject', 'proposal', 'confirm', 'remove'].includes(action)
+    )
       throw new NotFoundException();
     return this.transaction(async (tx) => {
       const own = eq(
@@ -242,6 +252,19 @@ export class BookingService {
       await lockPair(tx, initial.studentId, initial.tutorId);
       const [row] = await tx.select().from(swipes).where(where).for('update');
       if (!row) throw new NotFoundException();
+      if (action === 'remove') {
+        if (row.status !== 'rejected' && row.status !== 'withdrawn')
+          throw new ConflictException('Only cancelled requests can be removed');
+        await tx
+          .update(swipes)
+          .set(
+            user.role === 'student'
+              ? { studentRemoved: true }
+              : { tutorRemoved: true },
+          )
+          .where(where);
+        return { id };
+      }
       if (row.status !== 'pending' && row.status !== 'proposed')
         throw new ConflictException('Interest already closed');
       if (

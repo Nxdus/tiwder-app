@@ -200,6 +200,14 @@ describe('Tiwder API', () => {
       const cancel = (person = actor === 'student' ? student : tutor) =>
         api().post(`/api/matches/${matchId}/cancel`).set(person.headers);
       await api()
+        .post(`/api/interests/${interestId}/remove`)
+        .set(student.headers)
+        .expect(409);
+      await api()
+        .post(`/api/matches/${matchId}/remove`)
+        .set(student.headers)
+        .expect(404);
+      await api()
         .post('/api/onboarding')
         .set(outsider.headers)
         .send({
@@ -225,6 +233,10 @@ describe('Tiwder API', () => {
           : { reason: 'Schedule conflict' };
       await cancel().send(input).expect(201);
       await cancel().send(input).expect(409);
+      await api()
+        .post(`/api/interests/${interestId}/remove`)
+        .set(student.headers)
+        .expect(409);
       for (const person of [student, tutor]) {
         const { body } = await api()
           .get('/api/matches')
@@ -242,9 +254,10 @@ describe('Tiwder API', () => {
       }
     },
   );
-  it('keeps cancelled requests and their reasons in both interest lists without creating matched lessons', async () => {
+  it('removes cancelled requests only from the requesting account while preserving the other history', async () => {
     const student = await account(randomUUID());
     const tutor = await account(randomUUID());
+    const outsider = await account(randomUUID());
     const subjectId = (await api().get('/api/subjects')).body[0].id;
     for (const person of [student, tutor]) {
       await api()
@@ -266,6 +279,17 @@ describe('Tiwder API', () => {
         })
         .expect(201);
     }
+    await api()
+      .post('/api/onboarding')
+      .set(outsider.headers)
+      .send({
+        role: 'student',
+        name: outsider.name,
+        phone: '0812345678',
+        bio: 'Unrelated account',
+        gradeLevel: 'Grade 8',
+      })
+      .expect(201);
     for (const scenario of [
       'tutor-decline',
       'student-withdraw',
@@ -289,6 +313,9 @@ describe('Tiwder API', () => {
       const actor = scenario === 'tutor-decline' ? tutor : student;
       const cancel = () =>
         api().post(`/api/interests/${id}/${action}`).set(actor.headers);
+      const remove = (person: typeof student) =>
+        api().post(`/api/interests/${id}/remove`).set(person.headers);
+      await remove(actor).expect(409);
       await cancel().send({ reason: 'Other', details: ' ' }).expect(400);
       await cancel()
         .send({ reason: 'Other', details: '  Unable to attend  ' })
@@ -313,6 +340,30 @@ describe('Tiwder API', () => {
             .body,
         ).toEqual([]);
       }
+      const recipient = actor === tutor ? student : tutor;
+      const recipientBefore = (
+        await api().get('/api/interests').set(recipient.headers).expect(200)
+      ).body.find((item: { id: string }) => item.id === id);
+      await remove(outsider).expect(404);
+      await remove(recipient).expect(201);
+      await remove(recipient).expect(201);
+      for (let refresh = 0; refresh < 2; refresh++) {
+        const ownList = (
+          await api().get('/api/interests').set(recipient.headers).expect(200)
+        ).body;
+        expect(ownList.some((item: { id: string }) => item.id === id)).toBe(
+          false,
+        );
+      }
+      const otherList = (
+        await api().get('/api/interests').set(actor.headers).expect(200)
+      ).body;
+      expect(
+        otherList.find((item: { id: string }) => item.id === id),
+      ).toMatchObject({
+        cancellationReason: 'Unable to attend',
+        updatedAt: recipientBefore.updatedAt,
+      });
     }
   });
   it('persists profile photos, preserves them on other edits, and supports removal', async () => {

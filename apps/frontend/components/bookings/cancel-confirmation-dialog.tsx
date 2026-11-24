@@ -4,6 +4,15 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Button } from "@/components/ui/button";
 
 const confirmationCopy = {
+  remove: {
+    title: "Remove this request from your list?",
+    action: "remove this request from your list",
+    preposition: "with",
+    detail: "This only removes it from your list. The other person's history stays unchanged.",
+    keep: "Keep request",
+    confirm: "Remove",
+    pending: "Removing…",
+  },
   lesson: {
     title: "Cancel this lesson?",
     action: "cancel this lesson",
@@ -47,7 +56,7 @@ export default function CancelConfirmationDialog({
   onConfirm: () => void;
   busy?: boolean;
   targetName?: string;
-  kind?: "lesson" | "request" | "withdraw";
+  kind?: "lesson" | "request" | "withdraw" | "remove";
   error?: string;
 }) {
   const copy = confirmationCopy[kind];
@@ -67,7 +76,7 @@ export default function CancelConfirmationDialog({
               {copy.title}
             </Dialog.Title>
             <Dialog.Description className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              {`Are you sure you want to ${copy.action}${target}? ${copy.detail}`}
+              {kind === "remove" ? copy.detail : `Are you sure you want to ${copy.action}${target}? ${copy.detail}`}
             </Dialog.Description>
             {error && <p role="alert" className="mt-4 text-sm font-medium text-red-600">{error}</p>}
             <div className="mt-10 flex justify-end gap-3">

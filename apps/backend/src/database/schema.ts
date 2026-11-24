@@ -155,6 +155,8 @@ export const swipes = pgTable(
       mode: 'number',
     }).notNull(),
     cancellationReason: text('cancellation_reason'),
+    studentRemoved: boolean('student_removed').notNull().default(false),
+    tutorRemoved: boolean('tutor_removed').notNull().default(false),
     date: date(),
     start: integer(),
     end: integer(),
