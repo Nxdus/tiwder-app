@@ -333,7 +333,7 @@ function StudentDashboardContent({ tab }: { tab: StudentTab }) {
             key={tab}
             kind={tab === "Matched" ? "matches" : "interests"}
             onConfirmed={() => router.push("/student/matched")}
-            onRequested={() => router.push("/student/offered")}
+            onRequested={(requestId) => router.push(`/student/offered${requestId ? `?request=${encodeURIComponent(requestId)}` : ""}`)}
             offeredSubjectChoices={tab === "Offered" ? choices : undefined}
             loadingOfferedSubjects={loading}
           />

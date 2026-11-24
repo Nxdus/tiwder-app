@@ -28,6 +28,7 @@ import {
 import StudentCard from "@/components/tutor/student-card";
 import TutorHeader from "@/components/navigation/tutor-header";
 import TimeSelect from "./time-select";
+import RequestContext from "@/components/bookings/request-context";
 
 export default function TutorTimeSlot({
   interest,
@@ -90,15 +91,22 @@ export default function TutorTimeSlot({
   const dateValue = date ? format(date, "yyyy-MM-dd") : null;
   const currentDay = getBangkokDate(now);
   const validationError = getScheduleFeedback(dateValue, startSelection, endSelection, now);
+  const repeatsPreviousOffer = !interest.previousMatchId && Boolean(
+    interest.previousProposal &&
+    dateValue === interest.previousProposal.date &&
+    start === interest.previousProposal.start &&
+    end === interest.previousProposal.end,
+  );
   const conflict = dateValue && start !== null && end !== null && end > start
     ? findBookingConflict(bookings, { date: dateValue, start, end })
     : undefined;
-  const ready = !loadingBookings && !bookingError && !validationError && !conflict;
+  const ready = !loadingBookings && !bookingError && !validationError && !conflict && !repeatsPreviousOffer;
   const dateLabel = date
     ? format(date, "EEEE, d MMM yyyy", { locale: enUS })
     : "";
   const feedback = requestError || bookingError ||
-    (conflict ? "You have a class at this time." : validationError);
+    (conflict ? "You have a class at this time." : validationError ||
+      (repeatsPreviousOffer ? "Same time as before. Choose another." : null));
   async function submitRequest(action: "proposal" | "reject", cancellation?: CancellationInput) {
     if (submitting.current) return;
     setRequestError("");
@@ -114,6 +122,10 @@ export default function TutorTimeSlot({
         return;
       }
       body = JSON.stringify({ date: dateValue, start, end });
+      if (repeatsPreviousOffer) {
+        setRequestError("Same time as before. Choose another.");
+        return;
+      }
     }
     submitting.current = true;
     setSaving(true);
@@ -173,7 +185,7 @@ export default function TutorTimeSlot({
           </Link>
           <div className="flex w-full flex-col items-center gap-8 md:flex-row md:items-start">
             <div className="w-full max-w-[330px]">
-              <StudentCard student={studentOf(interest)} />
+          <StudentCard student={studentOf(interest)} requestContext={interest.status === "pending" && interest.previousProposal ? <RequestContext request={interest} tutorView detailed /> : undefined} />
             </div>
             <section
               aria-labelledby="schedule-heading"

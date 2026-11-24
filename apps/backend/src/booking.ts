@@ -80,6 +80,7 @@ const cancellationSchema = z
   .object({
     reason: z.enum([
       'Schedule conflict',
+      'Timing issues',
       'Personal reasons',
       'Health reasons',
       'Other',
@@ -164,13 +165,58 @@ export class BookingService {
   }
   async create(user: Identity, body: unknown) {
     requireRole(user, 'student');
-    const { tutorId, subjectId } = parse(
-      z.object({ tutorId: z.uuid(), subjectId: z.uuid() }).strict(),
+    const { tutorId, subjectId, previousMatchId } = parse(
+      z
+        .object({
+          tutorId: z.uuid(),
+          subjectId: z.uuid(),
+          previousMatchId: z.uuid().optional(),
+        })
+        .strict(),
       body,
     );
     return this.transaction(async (tx) => {
       await lockPair(tx, user.id, tutorId);
       await expire(tx, [user.id, tutorId]);
+      let previous: { date: string; start: number; end: number } | undefined;
+      if (previousMatchId) {
+        const [source] = await tx
+          .select({
+            status: matches.status,
+            date: timeSlots.date,
+            start: timeSlots.start,
+            end: timeSlots.end,
+          })
+          .from(matches)
+          .innerJoin(swipes, eq(swipes.id, matches.interestId))
+          .innerJoin(timeSlots, eq(timeSlots.id, matches.timeSlotId))
+          .where(
+            and(
+              eq(matches.id, previousMatchId),
+              eq(matches.studentId, user.id),
+              eq(matches.tutorId, tutorId),
+              eq(swipes.subjectId, subjectId),
+            ),
+          );
+        if (!source) throw new NotFoundException('Lesson not found');
+        if (source.status !== 'cancelled')
+          throw new ConflictException(
+            'Only cancelled lessons can be requested again this way',
+          );
+        previous = source;
+        const [existing] = await tx
+          .select({ id: swipes.id })
+          .from(swipes)
+          .where(
+            and(
+              eq(swipes.studentId, user.id),
+              eq(swipes.tutorId, tutorId),
+              eq(swipes.subjectId, subjectId),
+              inArray(swipes.status, ['pending', 'proposed']),
+            ),
+          );
+        if (existing) return { id: existing.id, reused: true };
+      }
       const [offer] = await tx
         .select({
           tutorName: users.name,
@@ -201,6 +247,14 @@ export class BookingService {
           studentId: user.id,
           tutorId,
           subjectId,
+          ...(previous
+            ? {
+                previousDate: previous.date,
+                previousStart: previous.start,
+                previousEnd: previous.end,
+                previousMatchId,
+              }
+            : {}),
         })
         .returning({ id: swipes.id });
       return row;
@@ -228,17 +282,37 @@ export class BookingService {
         );
       return withProfiles(
         tx,
-        rows.map(({ date, start, end, ...r }) => ({
-          ...r,
-          proposal: date ? { date, start, end } : null,
-        })),
+        rows.map(
+          ({
+            date,
+            start,
+            end,
+            previousDate,
+            previousStart,
+            previousEnd,
+            ...r
+          }) => ({
+            ...r,
+            proposal: date ? { date, start, end } : null,
+            previousProposal: previousDate
+              ? { date: previousDate, start: previousStart, end: previousEnd }
+              : null,
+          }),
+        ),
       );
     });
   }
   async change(user: Identity, id: string, action: string, body: unknown) {
     parse(z.uuid(), id);
     if (
-      !['withdraw', 'reject', 'proposal', 'confirm', 'remove'].includes(action)
+      ![
+        'withdraw',
+        'reject',
+        'proposal',
+        'confirm',
+        'remove',
+        'request-time',
+      ].includes(action)
     )
       throw new NotFoundException();
     return this.transaction(async (tx) => {
@@ -273,6 +347,48 @@ export class BookingService {
         slotTime(row.date, row.start).getTime() <= Date.now()
       )
         throw new ConflictException('Proposal expired');
+      if (action === 'request-time') {
+        requireRole(user, 'student');
+        const expected = parse(proposalSchema, body);
+        if (
+          row.status === 'pending' &&
+          row.previousDate === expected.date &&
+          row.previousStart === expected.start &&
+          row.previousEnd === expected.end
+        )
+          return { id };
+        if (
+          row.status !== 'proposed' ||
+          !row.date ||
+          row.start === null ||
+          row.end === null
+        )
+          throw new ConflictException('No time offer to change');
+        if (
+          row.date !== expected.date ||
+          row.start !== expected.start ||
+          row.end !== expected.end
+        )
+          throw new ConflictException(
+            'The time offer changed. Refresh and review it again.',
+          );
+        await tx
+          .update(swipes)
+          .set({
+            status: 'pending',
+            previousDate: row.date,
+            previousStart: row.start,
+            previousEnd: row.end,
+            previousMatchId: null,
+            date: null,
+            start: null,
+            end: null,
+            cancellationReason: null,
+            updatedAt: new Date(),
+          })
+          .where(where);
+        return { id };
+      }
       if (action === 'confirm') {
         requireRole(user, 'student');
         if (
@@ -317,6 +433,15 @@ export class BookingService {
         if (row.status !== 'pending')
           throw new ConflictException('Proposal already sent');
         const p = parse(proposalSchema, body);
+        if (
+          !row.previousMatchId &&
+          row.previousDate === p.date &&
+          row.previousStart === p.start &&
+          row.previousEnd === p.end
+        )
+          throw new ConflictException(
+            'Choose a different time from the previous offer.',
+          );
         if (slotTime(p.date, p.start).getTime() <= Date.now())
           throw new BadRequestException('Start must be in the future');
         await ensureAvailable(
