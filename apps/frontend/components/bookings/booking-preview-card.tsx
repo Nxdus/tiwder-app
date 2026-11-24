@@ -8,7 +8,7 @@ import type { Tutor } from "@/lib/student/tutors";
 import { formatMinutes, formatScheduleDate, type Proposal } from "@/lib/api";
 import { cn, formatCompactName } from "@/lib/utils";
 
-export default function BookingPreviewCard({ tutor, appointment, statusLabel, statusVariant, statusIcon, onOpen, emphasizeHover = false }: {
+export default function BookingPreviewCard({ tutor, appointment, statusLabel, statusVariant, statusIcon, onOpen, emphasizeHover = false, unscheduledLabel = "Schedule not set" }: {
   tutor: Tutor;
   appointment: Proposal | null;
   statusLabel: string;
@@ -16,11 +16,12 @@ export default function BookingPreviewCard({ tutor, appointment, statusLabel, st
   statusIcon: ReactNode;
   onOpen: () => void;
   emphasizeHover?: boolean;
+  unscheduledLabel?: string;
 }) {
   return (
     <button
       type="button"
-      aria-label={`${tutor.name}, ${statusLabel}${appointment ? `, ${formatScheduleDate(appointment.date)}, ${formatMinutes(appointment.start)}–${formatMinutes(appointment.end)}` : ", Schedule not set"}`}
+      aria-label={`${tutor.name}, ${statusLabel}${appointment ? `, ${formatScheduleDate(appointment.date)}, ${formatMinutes(appointment.start)}–${formatMinutes(appointment.end)}` : `, ${unscheduledLabel}`}`}
       onClick={onOpen}
       className={cn(
         "group relative block h-[270px] w-[152px] cursor-pointer overflow-hidden rounded-2xl bg-secondary text-left text-foreground ring-1 ring-border transition-[translate,scale,box-shadow] duration-200 ease-out hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none",
@@ -32,7 +33,7 @@ export default function BookingPreviewCard({ tutor, appointment, statusLabel, st
       <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3 group-has-[img[data-loaded=true]]:text-white group-has-[img[data-loaded=true]]:[text-shadow:0_1px_3px_rgb(0_0_0/0.85)]">
         <p title={tutor.name} className="truncate text-sm font-semibold leading-5">{formatCompactName(tutor.name)}</p>
         <div className="flex flex-col gap-1 text-xs leading-4 text-foreground/80 group-has-[img[data-loaded=true]]:text-white">
-          <p className="flex items-start gap-1.5"><CalendarDays aria-hidden="true" className="mt-0.5 size-3 shrink-0" /><span>{appointment ? formatScheduleDate(appointment.date) : "Schedule not set"}</span></p>
+          <p className="flex items-start gap-1.5"><CalendarDays aria-hidden="true" className="mt-0.5 size-3 shrink-0" /><span>{appointment ? formatScheduleDate(appointment.date) : unscheduledLabel}</span></p>
           {appointment && <p className="flex items-start gap-1.5"><Clock aria-hidden="true" className="mt-0.5 size-3 shrink-0" /><span className="tabular-nums">{formatMinutes(appointment.start)}–{formatMinutes(appointment.end)}</span></p>}
         </div>
         <Badge variant={statusVariant} className="h-auto max-w-full gap-1 whitespace-normal py-1 text-[11px] leading-4 [text-shadow:none]">{statusIcon}<span>{statusLabel}</span></Badge>

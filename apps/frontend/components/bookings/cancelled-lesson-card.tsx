@@ -5,6 +5,7 @@ import { formatSchedule, type Interest, type Match } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { CircleX } from "lucide-react";
 import BookingPreviewCard from "./booking-preview-card";
+import { formatCancellationTimestamp, unscheduledCancellationLabel } from "@/lib/cancellation-display";
 
 export function isCancelledBooking(item: { status: string }) {
   return ["cancelled", "rejected", "withdrawn"].includes(item.status);
@@ -18,11 +19,17 @@ export default function CancelledLessonCard({ lesson, tutorView = false, detail 
   emphasizeHover?: boolean;
 }) {
   const proposal = "proposal" in lesson ? lesson.proposal : lesson;
-  const schedule = proposal ? formatSchedule(proposal) : "Schedule not set";
+  const unscheduledLabel = unscheduledCancellationLabel(lesson.status);
+  const schedule = proposal ? formatSchedule(proposal) : unscheduledLabel;
+  const cancelledAt = formatCancellationTimestamp(lesson.updatedAt);
+  const cancellationDetails = cancelledAt ? (
+    <p className="text-sm"><span className="text-muted-foreground">{lesson.status === "withdrawn" ? "Withdrawn on" : "Cancelled on"}: </span><time dateTime={lesson.updatedAt}>{cancelledAt} (Bangkok)</time></p>
+  ) : null;
   if (tutorView) {
     return <StudentCard
-      student={{ id: lesson.studentId, name: lesson.studentName, photoUrl: lesson.student?.avatarUrl ?? undefined, photos: lesson.student?.photos, grade: "", about: "", subject: "", level: lesson.skillLevel }}
+      student={{ id: lesson.studentId, name: lesson.studentName, photoUrl: lesson.student?.avatarUrl ?? undefined, photos: lesson.student?.photos, grade: lesson.student?.gradeLevel ?? "", about: "", subject: lesson.subjectName, level: lesson.skillLevel }}
       cancelledReason={lesson.cancellationReason}
+      cancellationDetails={cancellationDetails}
       onOpen={onOpen}
       status={<Badge variant="destructive">Cancelled</Badge>}
       photoDetails={<Badge variant="secondary" className="h-auto whitespace-normal text-xs font-normal">{schedule}</Badge>}
@@ -33,7 +40,7 @@ export default function CancelledLessonCard({ lesson, tutorView = false, detail 
     photos: lesson.tutor?.photos, school: "", rate: 0, experience: "", about: "", subjects: [],
   };
   if (!detail && onOpen) {
-    return <BookingPreviewCard tutor={tutor} appointment={proposal} statusLabel="Cancelled" statusVariant="destructive" statusIcon={<CircleX aria-hidden="true" />} onOpen={onOpen} emphasizeHover={emphasizeHover} />;
+    return <BookingPreviewCard tutor={tutor} appointment={proposal} statusLabel="Cancelled" statusVariant="destructive" statusIcon={<CircleX aria-hidden="true" />} onOpen={onOpen} emphasizeHover={emphasizeHover} unscheduledLabel={unscheduledLabel} />;
   }
   const content = <>
     <div className={cn("relative shrink-0 overflow-hidden", detail ? "h-[200px]" : "h-full")}><TutorPhoto tutor={tutor} /></div>
@@ -41,6 +48,7 @@ export default function CancelledLessonCard({ lesson, tutorView = false, detail 
       <Badge variant="destructive" className="w-fit text-xs">Cancelled</Badge>
       <h2 className={cn("font-semibold", detail ? "text-xl" : "truncate text-sm")}>{lesson.tutorName}</h2>
       <p className={detail ? "text-sm text-muted-foreground" : "text-xs"}>{schedule}</p>
+      {detail && cancellationDetails}
       <p className={cn("break-words whitespace-pre-wrap", detail ? "text-sm" : "line-clamp-2 text-xs")}><span className={detail ? "text-muted-foreground" : "text-white/80"}>Reason: </span>{lesson.cancellationReason || "No reason provided"}</p>
     </div>
   </>;

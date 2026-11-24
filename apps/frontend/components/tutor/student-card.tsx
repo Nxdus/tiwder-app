@@ -22,6 +22,7 @@ export default function StudentCard({
   actions,
   className,
   cancelledReason,
+  cancellationDetails,
   onOpen,
 }: {
   student: Student;
@@ -32,6 +33,7 @@ export default function StudentCard({
   actions?: ReactNode;
   className?: string;
   cancelledReason?: string | null;
+  cancellationDetails?: ReactNode;
   onOpen?: () => void;
 }) {
   const photos = student.photos?.length
@@ -176,8 +178,22 @@ export default function StudentCard({
       {cancelledReason !== undefined ? (
         <CardContent className="flex flex-1 flex-col gap-4 p-4">
           {status}
-          <h2 className="text-xl font-semibold">{student.name}</h2>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <h2 className="text-xl font-semibold">{student.name}</h2>
+            {student.grade && <Badge variant="secondary">{student.grade}</Badge>}
+          </div>
+          {cancellationDetails}
           <p className="break-words whitespace-pre-wrap text-sm"><span className="text-muted-foreground">Reason: </span>{cancelledReason || "No reason provided"}</p>
+          <div className="mt-auto flex flex-col gap-4">
+            <Separator />
+            <section aria-label={`Subject chosen by ${student.name}`} className="flex flex-col gap-2">
+              <h3 className="text-base font-semibold">Subject chose</h3>
+              <div className="flex flex-col items-start gap-2">
+                <Badge className="border-primary/20 bg-primary/20 px-2.5 py-1 text-xs text-primary-foreground">{student.subject}</Badge>
+                <p className="flex items-center gap-2 text-xs text-muted-foreground"><Gauge aria-hidden="true" className="size-4 shrink-0" />{student.level}</p>
+              </div>
+            </section>
+          </div>
         </CardContent>
       ) : <CardContent className="flex flex-1 flex-col gap-4 p-4">
         <div className="flex flex-col items-start gap-3">

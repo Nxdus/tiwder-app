@@ -6,7 +6,8 @@ Cancel lesson → choose a reason → Continue → review → Confirm cancellati
 
 - Choose Schedule conflict, Personal reasons, Health reasons, or Other (required text, up to 300 characters).
 - Both roles can cancel a future confirmed lesson. The reason is stored in the database and returned to both participants.
-- Cancelled cards retain the original role-specific photo and card size. Only the name, schedule, cancellation status and reason are shown; contact information, biography, subject and price are hidden. Open a cancelled card to read the complete reason. There is no delete button.
+- Cancelled cards retain the original role-specific photo and card size. Contact information, biography and price remain hidden. Tutor cards also show the student's grade and Subject chose with skill level. Open a cancelled card to read the complete reason. There is no delete button.
+- Scheduled cancellations show the lesson date/time. A withdrawn request without a proposed time says “Withdrawn before scheduling”; other unscheduled requests say “Schedule not set”. Tutor cards and opened student cards additionally show the recorded cancellation/withdrawal timestamp in Bangkok time, separately from the lesson schedule.
 - Student list cards use the same preview component as active cards: name, calendar/time rows and status badge. The full cancellation reason appears after opening the card so preview layout stays consistent.
 - Cancelled requests appear only for the recipient: tutor Decline → Student Offered; student Withdraw or decline of a proposed time → Tutor Swiped. The initiating party no longer sees that request card. Records and reasons remain stored. Cancelled confirmed lessons still appear in both participants' Matched pages.
 - No cancellation notification bell or notification delivery is included in this alternative.
