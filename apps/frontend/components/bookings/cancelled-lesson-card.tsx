@@ -23,7 +23,10 @@ export default function CancelledLessonCard({ lesson, tutorView = false, detail 
   const schedule = proposal ? formatSchedule(proposal) : unscheduledLabel;
   const cancelledAt = formatCancellationTimestamp(lesson.updatedAt);
   const cancellationDetails = cancelledAt ? (
-    <p className="text-sm"><span className="text-muted-foreground">{lesson.status === "withdrawn" ? "Withdrawn on" : "Cancelled on"}: </span><time dateTime={lesson.updatedAt}>{cancelledAt} (Bangkok)</time></p>
+    <dl className="space-y-1 text-sm">
+      <dt className="text-xs font-medium text-muted-foreground">{lesson.status === "withdrawn" ? "Withdrawn on" : "Cancelled on"}</dt>
+      <dd><time dateTime={lesson.updatedAt}>{cancelledAt} (Bangkok)</time></dd>
+    </dl>
   ) : null;
   if (tutorView) {
     return <StudentCard

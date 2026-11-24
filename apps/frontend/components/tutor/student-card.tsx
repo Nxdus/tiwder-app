@@ -183,8 +183,11 @@ export default function StudentCard({
             {student.grade && <Badge variant="secondary">{student.grade}</Badge>}
           </div>
           {cancellationDetails}
-          <p className="break-words whitespace-pre-wrap text-sm"><span className="text-muted-foreground">Reason: </span>{cancelledReason || "No reason provided"}</p>
-          <div className="mt-auto flex flex-col gap-4">
+          <div className="min-h-20 space-y-2 rounded-xl bg-muted/60 p-3">
+            <p className="text-xs font-medium text-muted-foreground">Reason</p>
+            <p className="break-words whitespace-pre-wrap text-sm leading-relaxed">{cancelledReason || "No reason provided"}</p>
+          </div>
+          <div className="mt-1 flex flex-col gap-4">
             <Separator />
             <section aria-label={`Subject chosen by ${student.name}`} className="flex flex-col gap-2">
               <h3 className="text-base font-semibold">Subject chose</h3>
