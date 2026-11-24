@@ -56,14 +56,20 @@ export default function BookingConfirmationDialog({
                 : "Are you sure you want to confirm this match with your tutor? Your tutoring session will be confirmed."}
             </Dialog.Description>
             {summary && (
-              <div className="mt-4 space-y-2 text-sm">
-                <p className="text-muted-foreground">{summary.date}</p>
-                <p className="font-medium">{summary.time}</p>
-                <p className="pt-1">
-                  <span className="text-muted-foreground">Total lesson fee: </span>
-                  <span className="font-semibold">฿{summary.fee}</span>
-                </p>
-              </div>
+              <dl className="mt-5 space-y-3 text-sm">
+                <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-6">
+                  <dt className="text-muted-foreground">Date</dt>
+                  <dd className="text-right font-normal">{summary.date}</dd>
+                </div>
+                <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-6">
+                  <dt className="text-muted-foreground">Time</dt>
+                  <dd className="text-right font-normal">{summary.time}</dd>
+                </div>
+                <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-6 border-t pt-3">
+                  <dt className="text-muted-foreground">Total lesson fee</dt>
+                  <dd className="text-right font-semibold tabular-nums">฿{summary.fee}</dd>
+                </div>
+              </dl>
             )}
             {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
             <div className="mt-10 flex justify-end gap-3">
