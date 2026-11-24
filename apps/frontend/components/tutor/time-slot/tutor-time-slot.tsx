@@ -260,14 +260,28 @@ export default function TutorTimeSlot({
                   {feedback}
                 </p>
               )}
-              <Button
-                variant="destructive"
-                className="self-end"
-                disabled={saving}
-                onClick={() => setDeclineOpen(true)}
-              >
-                Decline
-              </Button>
+              <div className="flex w-full items-center gap-3">
+                <Button
+                  variant="destructive"
+                  size="lg"
+                  className="flex-1"
+                  disabled={saving}
+                  onClick={() => setDeclineOpen(true)}
+                >
+                  Decline
+                </Button>
+                <Button
+                  size="lg"
+                  className="flex-1"
+                  disabled={saving || !ready}
+                  onClick={() => {
+                    setRequestError("");
+                    setOfferOpen(true);
+                  }}
+                >
+                  {saving ? "Sending…" : "Confirm Time"}
+                </Button>
+              </div>
             </section>
           </div>
         </div>
@@ -294,16 +308,6 @@ export default function TutorTimeSlot({
                 "en-US",
               )}
             </Badge>
-            <Button
-              size="lg"
-              disabled={saving}
-              onClick={() => {
-                setRequestError("");
-                setOfferOpen(true);
-              }}
-            >
-              {saving ? "Sending…" : "Confirm Time"}
-            </Button>
           </div>
         )}
       </main>
