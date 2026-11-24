@@ -24,6 +24,7 @@ import { BookingListSkeleton } from "@/components/loading/skeletons";
 import BookingConfirmationDialog from "@/components/bookings/booking-confirmation-dialog";
 import CancelConfirmationDialog from "@/components/bookings/cancel-confirmation-dialog";
 import LessonCancellationDialog, { type CancellationInput } from "@/components/bookings/lesson-cancellation-dialog";
+import CancelledLessonCard from "@/components/bookings/cancelled-lesson-card";
 import DeletedAccountCard from "@/components/bookings/deleted-account-card";
 import {
   api,
@@ -511,10 +512,18 @@ function BookingListContent({
             </Button>
           )}
         </Empty>
+      ) : role === "student" && selected?.status === "cancelled" && "cancellationReason" in selected ? (
+        <div className="mx-auto w-full max-w-[330px] space-y-4">
+          {visible.length > 1 && <Button variant="ghost" onClick={() => setSelectedId("")}>Back to matches</Button>}
+          <CancelledLessonCard lesson={selected} name={selected.tutorName} />
+        </div>
       ) : role === "tutor" ? (
         <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,330px),330px))] justify-center gap-x-10 gap-y-[50px]">
           {visible.map((item) => {
             const p = proposalOf(item);
+            if (item.status === "cancelled" && "cancellationReason" in item) {
+              return <li key={item.id}><CancelledLessonCard lesson={item} name={item.studentName} /></li>;
+            }
             return (
               <li key={item.id} className="h-full">
                 <StudentCard
@@ -669,6 +678,9 @@ function BookingListContent({
         <ul className="mx-auto mt-8 grid max-w-[536px] grid-cols-[repeat(auto-fit,152px)] justify-center gap-x-6 gap-y-[50px] sm:gap-x-10">
           {visible.map((item) => {
             const p = proposalOf(item);
+            if (item.status === "cancelled" && "cancellationReason" in item) {
+              return <li key={item.id}><CancelledLessonCard lesson={item} name={item.tutorName} /></li>;
+            }
             return (
               <li key={item.id} className="h-full">
                 <button
